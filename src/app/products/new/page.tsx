@@ -64,23 +64,28 @@ export default function NewProductPage() {
 
   const handleUpload = async (options: any) => {
     const { file, onSuccess, onError } = options
-
+    
+    console.log('handleUpload called with file:', file.name)
+    
     try {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('folder', 'products')
 
+      console.log('Uploading to /api/upload...')
+      
       const response = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       })
 
       const result = await response.json()
+      console.log('Upload response:', result)
 
       if (result.success) {
         const ossUrl = result.data.url
-        file.ossUrl = ossUrl
-        onSuccess({ url: ossUrl, ossUrl })
+        console.log('Upload successful, ossUrl:', ossUrl)
+        onSuccess({ ossUrl, url: ossUrl })
         message.success('图片上传成功')
       } else {
         throw new Error(result.error || '上传失败')
@@ -94,16 +99,24 @@ export default function NewProductPage() {
 
   const handleFileChange = (info: any) => {
     const { file, fileList: newFileList } = info
+    
+    console.log('handleFileChange called, file.status:', file.status)
+    console.log('file.response:', file.response)
 
-    const updatedList: ImageFile[] = newFileList.map((f: any) => ({
-      uid: f.uid,
-      name: f.name,
-      url: f.url || f.thumbUrl || '',
-      thumbUrl: f.thumbUrl,
-      status: f.status,
-      ossUrl: f.ossUrl || f.response?.ossUrl,
-    }))
+    const updatedList: ImageFile[] = newFileList.map((f: any) => {
+      const ossUrl = f.response?.ossUrl || f.response?.url || f.ossUrl
+      console.log(`File ${f.name}: status=${f.status}, ossUrl=${ossUrl}`)
+      return {
+        uid: f.uid,
+        name: f.name,
+        url: f.url || f.thumbUrl || ossUrl || '',
+        thumbUrl: f.thumbUrl,
+        status: f.status,
+        ossUrl: ossUrl,
+      }
+    })
 
+    console.log('Updated fileList:', updatedList.map(f => ({ name: f.name, status: f.status, ossUrl: f.ossUrl })))
     setFileList(updatedList)
   }
 
@@ -149,6 +162,9 @@ export default function NewProductPage() {
   }
 
   const onFinish = async (values: any) => {
+    console.log('onFinish called with values:', values)
+    console.log('current fileList:', fileList.map(f => ({ name: f.name, status: f.status, ossUrl: f.ossUrl })))
+    
     const hasUploading = fileList.some(f => f.status === 'uploading')
     if (hasUploading) {
       message.warning('图片正在上传中，请稍候...')
@@ -162,6 +178,8 @@ export default function NewProductPage() {
     }
 
     const uploadedImages = fileList.filter(f => f.status === 'done' && f.ossUrl)
+    console.log('uploadedImages:', uploadedImages)
+    
     if (uploadedImages.length === 0) {
       message.error('请至少上传一张商品图片')
       return
@@ -184,6 +202,8 @@ export default function NewProductPage() {
         images: imageUrls,
       }
 
+      console.log('Sending product data:', productData)
+
       const response = await fetch('/api/products', {
         method: 'POST',
         headers: {
@@ -193,6 +213,7 @@ export default function NewProductPage() {
       })
 
       const result = await response.json()
+      console.log('API response:', result)
 
       if (result.success) {
         message.success('商品发布成功！')
