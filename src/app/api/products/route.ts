@@ -45,7 +45,24 @@ export async function POST(request: NextRequest) {
       images,
     } = body
 
-    if (!name || !description || !price || !category || !condition || !location || !contactInfo) {
+    console.log('Received product data:', {
+      name,
+      description,
+      price,
+      category,
+      condition,
+      location,
+      contactInfo,
+      images,
+    })
+
+    if (name == null || name === '' ||
+        description == null || description === '' ||
+        price == null ||
+        category == null || category === '' ||
+        condition == null || condition === '' ||
+        location == null || location === '' ||
+        contactInfo == null || contactInfo === '') {
       return NextResponse.json(
         {
           success: false,
