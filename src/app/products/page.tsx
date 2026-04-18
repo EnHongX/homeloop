@@ -1,95 +1,14 @@
 'use client'
 
-import { Typography, Button, Card, Row, Col, Space, Tag, Input, Select, Pagination, theme, Result, Statistic, Divider } from 'antd'
+import { Typography, Button, Card, Row, Col, Space, Tag, Input, Select, Pagination, theme, Result, Statistic, Divider, Spin, Empty } from 'antd'
 import Link from 'next/link'
-import { PlusOutlined, ShoppingOutlined, SearchOutlined, FilterOutlined, EnvironmentOutlined, TagOutlined } from '@ant-design/icons'
-import { useState } from 'react'
+import { PlusOutlined, ShoppingOutlined, SearchOutlined, FilterOutlined, EnvironmentOutlined, TagOutlined, LoadingOutlined } from '@ant-design/icons'
+import { useState, useEffect } from 'react'
 import AppLayout from '@/components/AppLayout'
 
 const { Title, Text } = Typography
 const { Search } = Input
 const { Option } = Select
-
-const mockProducts = [
-  {
-    id: '1',
-    name: '实木餐桌 带4把椅子',
-    price: 2999,
-    originalPrice: 5999,
-    category: '桌椅',
-    condition: '九成新',
-    images: ['https://placehold.co/600x400/e6f7ff/1890ff?text=实木餐桌'],
-    location: '北京市朝阳区',
-    status: 'available',
-    views: 234,
-    publishTime: '2天前',
-  },
-  {
-    id: '2',
-    name: '北欧简约布艺沙发 三人位',
-    price: 1500,
-    originalPrice: 3500,
-    category: '沙发',
-    condition: '八成新',
-    images: ['https://placehold.co/600x400/f6ffed/52c41a?text=布艺沙发'],
-    location: '上海市浦东新区',
-    status: 'available',
-    views: 456,
-    publishTime: '3天前',
-  },
-  {
-    id: '3',
-    name: '宜家书柜 书架 五层',
-    price: 800,
-    originalPrice: 1800,
-    category: '柜子',
-    condition: '全新',
-    images: ['https://placehold.co/600x400/fff7e6/fa8c16?text=书柜'],
-    location: '广州市天河区',
-    status: 'available',
-    views: 123,
-    publishTime: '1天前',
-  },
-  {
-    id: '4',
-    name: '北欧风格实木床 1.8米',
-    price: 2200,
-    originalPrice: 4500,
-    category: '床',
-    condition: '九成新',
-    images: ['https://placehold.co/600x400/e6fffb/13c2c2?text=实木床'],
-    location: '深圳市南山区',
-    status: 'available',
-    views: 567,
-    publishTime: '5天前',
-  },
-  {
-    id: '5',
-    name: '现代简约LED落地灯',
-    price: 350,
-    originalPrice: 800,
-    category: '灯具',
-    condition: '全新',
-    images: ['https://placehold.co/600x400/f9f0ff/722ed1?text=落地灯'],
-    location: '杭州市西湖区',
-    status: 'available',
-    views: 89,
-    publishTime: '今天',
-  },
-  {
-    id: '6',
-    name: '复古装饰画 客厅挂画',
-    price: 180,
-    originalPrice: 400,
-    category: '装饰',
-    condition: '八成新',
-    images: ['https://placehold.co/600x400/fff0f6/eb2f96?text=装饰画'],
-    location: '成都市武侯区',
-    status: 'available',
-    views: 234,
-    publishTime: '1周前',
-  },
-]
 
 const categories = ['全部', '沙发', '桌椅', '柜子', '床', '灯具', '装饰']
 const conditions = ['全部', '全新', '九成新', '八成新', '七成新及以下']
@@ -101,17 +20,56 @@ const sortOptions = [
   { value: 'views', label: '最多浏览' },
 ]
 
+interface Product {
+  id: string
+  name: string
+  description: string | null
+  price: number
+  originalPrice: number | null
+  categoryId: string | null
+  condition: string
+  images: string[]
+  location: string | null
+  contactInfo: string | null
+  status: string
+  createdAt: string
+  updatedAt: string
+  userId: string | null
+  views: number
+  isFeatured: boolean
+  category: {
+    id: string
+    name: string
+  } | null
+}
+
 export default function ProductsPage() {
   const { token } = theme.useToken()
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchText, setSearchText] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('全部')
   const [selectedCondition, setSelectedCondition] = useState('全部')
   const [sortBy, setSortBy] = useState('default')
   const [currentPage, setCurrentPage] = useState(1)
 
-  const stats = {
-    total: 1234,
-    today: 56,
+  useEffect(() => {
+    fetchProducts()
+  }, [])
+
+  const fetchProducts = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch('/api/products')
+      const result = await response.json()
+      if (result.success) {
+        setProducts(result.data)
+      }
+    } catch (error) {
+      console.error('Error fetching products:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const getConditionColor = (condition: string) => {
@@ -125,6 +83,55 @@ export default function ProductsPage() {
       default:
         return 'default'
     }
+  }
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diff = now.getTime() - date.getTime()
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+    
+    if (days === 0) return '今天'
+    if (days === 1) return '1天前'
+    if (days < 7) return `${days}天前`
+    if (days < 30) return `${Math.floor(days / 7)}周前`
+    return `${Math.floor(days / 30)}个月前`
+  }
+
+  const filteredProducts = products.filter((product) => {
+    if (searchText && !product.name.toLowerCase().includes(searchText.toLowerCase())) {
+      return false
+    }
+    if (selectedCategory !== '全部' && product.category?.name !== selectedCategory) {
+      return false
+    }
+    if (selectedCondition !== '全部' && product.condition !== selectedCondition) {
+      return false
+    }
+    return true
+  })
+
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+    switch (sortBy) {
+      case 'price-asc':
+        return Number(a.price) - Number(b.price)
+      case 'price-desc':
+        return Number(b.price) - Number(a.price)
+      case 'newest':
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      case 'views':
+        return b.views - a.views
+      default:
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    }
+  })
+
+  const stats = {
+    total: products.length,
+    today: products.filter((p) => {
+      const today = new Date().toDateString()
+      return new Date(p.createdAt).toDateString() === today
+    }).length,
   }
 
   return (
@@ -266,7 +273,7 @@ export default function ProductsPage() {
           </Col>
           <Col>
             <Text type="secondary" style={{ fontSize: '13px' }}>
-              找到 <Text strong>{mockProducts.length}</Text> 个商品
+              找到 <Text strong>{sortedProducts.length}</Text> 个商品
             </Text>
           </Col>
         </Row>
@@ -279,10 +286,17 @@ export default function ProductsPage() {
           padding: '0 16px 48px',
         }}
       >
-        {mockProducts.length > 0 ? (
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '80px 0' }}>
+            <Spin indicator={<LoadingOutlined style={{ fontSize: 48 }} spin />} />
+            <div style={{ marginTop: 16 }}>
+              <Text type="secondary">加载中...</Text>
+            </div>
+          </div>
+        ) : sortedProducts.length > 0 ? (
           <>
             <Row gutter={[20, 20]}>
-              {mockProducts.map((product) => (
+              {sortedProducts.map((product) => (
                 <Col xs={24} sm={12} md={8} lg={6} key={product.id}>
                   <Link href={`/products/${product.id}`} style={{ display: 'block' }}>
                     <Card
@@ -299,7 +313,7 @@ export default function ProductsPage() {
                         <div style={{ position: 'relative' }}>
                           <img
                             alt={product.name}
-                            src={product.images[0]}
+                            src={product.images[0] || 'https://placehold.co/600x400/e6f7ff/1890ff?text=暂无图片'}
                             style={{
                               height: '180px',
                               objectFit: 'cover',
@@ -318,6 +332,34 @@ export default function ProductsPage() {
                               }}
                             >
                               在售
+                            </Tag>
+                          )}
+                          {product.status === 'reserved' && (
+                            <Tag
+                              color="orange"
+                              style={{
+                                position: 'absolute',
+                                top: '12px',
+                                left: '12px',
+                                margin: 0,
+                                borderRadius: '4px',
+                              }}
+                            >
+                              已预订
+                            </Tag>
+                          )}
+                          {product.status === 'sold' && (
+                            <Tag
+                              color="default"
+                              style={{
+                                position: 'absolute',
+                                top: '12px',
+                                left: '12px',
+                                margin: 0,
+                                borderRadius: '4px',
+                              }}
+                            >
+                              已售出
                             </Tag>
                           )}
                           <Tag
@@ -367,7 +409,7 @@ export default function ProductsPage() {
                             color: '#ff4d4f',
                           }}
                         >
-                          ¥{product.price}
+                          ¥{Number(product.price).toFixed(0)}
                         </Text>
                         {product.originalPrice && (
                           <Text
@@ -375,7 +417,7 @@ export default function ProductsPage() {
                             type="secondary"
                             style={{ fontSize: '13px' }}
                           >
-                            ¥{product.originalPrice}
+                            ¥{Number(product.originalPrice).toFixed(0)}
                           </Text>
                         )}
                       </div>
@@ -387,7 +429,7 @@ export default function ProductsPage() {
                           <Space size={4}>
                             <TagOutlined style={{ fontSize: '12px', color: token.colorTextSecondary }} />
                             <Text type="secondary" style={{ fontSize: '12px' }}>
-                              {product.category}
+                              {product.category?.name || '未分类'}
                             </Text>
                           </Space>
                         </Col>
@@ -395,7 +437,7 @@ export default function ProductsPage() {
                           <Space size={4}>
                             <EnvironmentOutlined style={{ fontSize: '12px', color: token.colorTextSecondary }} />
                             <Text type="secondary" style={{ fontSize: '12px' }}>
-                              {product.location.split('市')[0]}
+                              {product.location?.split('市')[0] || '未知'}
                             </Text>
                           </Space>
                         </Col>
@@ -404,7 +446,7 @@ export default function ProductsPage() {
                       <Row gutter={[8, 8]} style={{ marginTop: '8px' }}>
                         <Col span={12}>
                           <Text type="secondary" style={{ fontSize: '12px' }}>
-                            {product.publishTime}
+                            {formatDate(product.createdAt)}
                           </Text>
                         </Col>
                         <Col span={12} style={{ textAlign: 'right' }}>
@@ -419,44 +461,38 @@ export default function ProductsPage() {
               ))}
             </Row>
 
-            <div style={{ marginTop: '40px', textAlign: 'center' }}>
-              <Pagination
-                current={currentPage}
-                onChange={(page) => setCurrentPage(page)}
-                total={50}
-                pageSize={12}
-                showSizeChanger
-                showQuickJumper
-                showTotal={(total) => `共 ${total} 件商品`}
-                size="large"
-              />
-            </div>
+            {sortedProducts.length > 12 && (
+              <div style={{ marginTop: '40px', textAlign: 'center' }}>
+                <Pagination
+                  current={currentPage}
+                  onChange={(page) => setCurrentPage(page)}
+                  total={sortedProducts.length}
+                  pageSize={12}
+                  showSizeChanger
+                  showQuickJumper
+                  showTotal={(total) => `共 ${total} 件商品`}
+                />
+              </div>
+            )}
           </>
         ) : (
           <div style={{ padding: '80px 0', textAlign: 'center' }}>
-            <Result
-              status="info"
-              icon={<ShoppingOutlined />}
-              title="暂无符合条件的商品"
-              subTitle="尝试调整筛选条件或搜索关键词"
-              extra={
-                <Space>
-                  <Button
-                    type="primary"
-                    onClick={() => {
-                      setSearchText('')
-                      setSelectedCategory('全部')
-                      setSelectedCondition('全部')
-                    }}
-                  >
-                    重置筛选
-                  </Button>
-                  <Link href="/products/new">
-                    <Button icon={<PlusOutlined />}>发布第一个商品</Button>
-                  </Link>
-                </Space>
+            <Empty
+              description={
+                <div>
+                  <Text strong style={{ display: 'block', marginBottom: 8 }}>
+                    暂无符合条件的商品
+                  </Text>
+                  <Text type="secondary">尝试调整筛选条件或搜索关键词</Text>
+                </div>
               }
-            />
+            >
+              <Link href="/products/new">
+                <Button type="primary" icon={<PlusOutlined />}>
+                  发布第一个商品
+                </Button>
+              </Link>
+            </Empty>
           </div>
         )}
       </div>

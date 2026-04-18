@@ -7,13 +7,6 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import AppLayout from '@/components/AppLayout'
 
-const { Title, Text } = Typography
-const { TextArea } = Input
-const { Option } = Select
-
-const categories = ['沙发', '桌椅', '柜子', '床', '灯具', '装饰', '其他']
-const conditions = ['全新', '九成新', '八成新', '七成新及以下']
-
 const getBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -22,12 +15,20 @@ const getBase64 = (file: File): Promise<string> =>
     reader.onerror = (error) => reject(error)
   })
 
+const { Title, Text } = Typography
+const { TextArea } = Input
+const { Option } = Select
+
+const categories = ['沙发', '桌椅', '柜子', '床', '灯具', '装饰', '其他']
+const conditions = ['全新', '九成新', '八成新', '七成新及以下']
+
 export default function NewProductPage() {
   const router = useRouter()
   const [form] = Form.useForm()
   const { token } = theme.useToken()
   const [currentStep, setCurrentStep] = useState(0)
   const [fileList, setFileList] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
 
   const steps = [
     {
@@ -83,10 +84,48 @@ export default function NewProductPage() {
     },
   }
 
-  const onFinish = (values: any) => {
-    console.log('Form values:', { ...values, images: fileList })
-    message.success('商品发布成功！')
-    router.push('/products')
+  const onFinish = async (values: any) => {
+    setLoading(true)
+    try {
+      const formData = new FormData()
+      
+      formData.append('name', values.name)
+      formData.append('description', values.description)
+      formData.append('price', values.price.toString())
+      if (values.originalPrice) {
+        formData.append('originalPrice', values.originalPrice.toString())
+      }
+      formData.append('category', values.category)
+      formData.append('condition', values.condition)
+      formData.append('location', values.location)
+      formData.append('contactInfo', values.contactInfo)
+      formData.append('status', values.status || 'available')
+
+      fileList.forEach((file) => {
+        if (file.originFileObj) {
+          formData.append('images', file.originFileObj)
+        }
+      })
+
+      const response = await fetch('/api/products', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        message.success('商品发布成功！')
+        router.push('/products')
+      } else {
+        message.error(result.error || '发布失败，请重试')
+      }
+    } catch (error) {
+      console.error('Error submitting form:', error)
+      message.error('发布失败，请稍后重试')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const nextStep = async () => {
@@ -529,6 +568,7 @@ export default function NewProductPage() {
                       htmlType="submit"
                       size="large"
                       icon={<PlusOutlined />}
+                      loading={loading}
                       style={{
                         borderRadius: '8px',
                         height: '44px',
