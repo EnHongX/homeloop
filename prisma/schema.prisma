@@ -11,30 +11,31 @@ datasource db {
 }
 
 model Product {
-  id          String     @id @default(cuid())
-  name        String
-  description String?
-  price       Decimal
-  originalPrice Decimal?
-  category    String
-  condition   String
-  images      String[]
-  location    String?
-  contactInfo String?
-  status      String     @default("available")
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  userId      String?
-  views       Int        @default(0)
-  isFeatured  Boolean    @default(false)
+  id              String     @id @default(cuid())
+  name            String
+  description     String?
+  price           Decimal
+  originalPrice   Decimal?
+  categoryId      String?
+  category        Category?  @relation(fields: [categoryId], references: [id])
+  condition       String
+  images          String[]
+  location        String?
+  contactInfo     String?
+  status          String     @default("available")
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  userId          String?
+  views           Int        @default(0)
+  isFeatured      Boolean    @default(false)
 }
 
 model Category {
-  id        String     @id @default(cuid())
-  name      String     @unique
+  id        String    @id @default(cuid())
+  name      String    @unique
   icon      String?
-  sortOrder Int        @default(0)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  products  Product[]  @relation(fields: [name], references: [category])
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
 }
