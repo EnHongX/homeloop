@@ -4,7 +4,7 @@ import { Typography, Button, Card, Row, Col, Form, Input, InputNumber, Select, U
 import Link from 'next/link'
 import { HomeOutlined, PlusOutlined, ArrowLeftOutlined, FileTextOutlined, PictureOutlined, TagOutlined, EnvironmentOutlined, PhoneOutlined, CheckCircleOutlined, LoadingOutlined } from '@ant-design/icons'
 import { useRouter } from 'next/navigation'
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import AppLayout from '@/components/AppLayout'
 
 const getBase64 = (file: File): Promise<string> =>
@@ -29,7 +29,6 @@ interface ImageFile {
   thumbUrl?: string
   status: 'uploading' | 'done' | 'error'
   ossUrl?: string
-  originFileObj?: File
 }
 
 export default function NewProductPage() {
@@ -39,7 +38,6 @@ export default function NewProductPage() {
   const [currentStep, setCurrentStep] = useState(0)
   const [fileList, setFileList] = useState<ImageFile[]>([])
   const [loading, setLoading] = useState(false)
-  const uploadingUidsRef = useRef<Set<string>>(new Set())
 
   const steps = [
     {
@@ -64,7 +62,9 @@ export default function NewProductPage() {
     },
   ]
 
-  const uploadImageToOSS = async (file: File, uid: string): Promise<string | null> => {
+  const handleUpload = async (options: any) => {
+    const { file, onSuccess, onError } = options
+
     try {
       const formData = new FormData()
       formData.append('file', file)
@@ -78,70 +78,38 @@ export default function NewProductPage() {
       const result = await response.json()
 
       if (result.success) {
-        return result.data.url
+        const ossUrl = result.data.url
+        file.ossUrl = ossUrl
+        onSuccess({ url: ossUrl, ossUrl })
+        message.success('图片上传成功')
       } else {
         throw new Error(result.error || '上传失败')
       }
     } catch (error) {
-      console.error('Error uploading image:', error)
-      return null
+      console.error('Upload error:', error)
+      onError(error)
+      message.error('图片上传失败，请重试')
     }
   }
 
-  const handleFileChange = async (info: any) => {
+  const handleFileChange = (info: any) => {
     const { file, fileList: newFileList } = info
 
-    const updatedList: ImageFile[] = newFileList.map((f: any) => {
-      const existing = fileList.find(item => item.uid === f.uid)
-      return {
-        uid: f.uid,
-        name: f.name,
-        url: f.url || f.thumbUrl || existing?.url || '',
-        thumbUrl: f.thumbUrl || existing?.thumbUrl,
-        status: existing?.status || 'uploading',
-        ossUrl: existing?.ossUrl,
-        originFileObj: f.originFileObj || existing?.originFileObj,
-      }
-    })
+    const updatedList: ImageFile[] = newFileList.map((f: any) => ({
+      uid: f.uid,
+      name: f.name,
+      url: f.url || f.thumbUrl || '',
+      thumbUrl: f.thumbUrl,
+      status: f.status,
+      ossUrl: f.ossUrl || f.response?.ossUrl,
+    }))
 
     setFileList(updatedList)
-
-    if (file.status === 'removed') {
-      uploadingUidsRef.current.delete(file.uid)
-      return
-    }
-
-    if (file.originFileObj && !uploadingUidsRef.current.has(file.uid)) {
-      uploadingUidsRef.current.add(file.uid)
-
-      setFileList(prev => prev.map(f => 
-        f.uid === file.uid ? { ...f, status: 'uploading' } : f
-      ))
-
-      const ossUrl = await uploadImageToOSS(file.originFileObj, file.uid)
-
-      uploadingUidsRef.current.delete(file.uid)
-
-      if (ossUrl) {
-        setFileList(prev => prev.map(f => 
-          f.uid === file.uid ? { ...f, status: 'done', ossUrl, url: ossUrl } : f
-        ))
-        message.success('图片上传成功')
-      } else {
-        setFileList(prev => prev.map(f => 
-          f.uid === file.uid ? { ...f, status: 'error' } : f
-        ))
-        message.error('图片上传失败，请重试')
-      }
-    }
   }
 
   const handlePreview = async (file: any) => {
     const imageFile = fileList.find(f => f.uid === file.uid)
     let src = imageFile?.ossUrl || imageFile?.url || file.url
-    if (!src && imageFile?.originFileObj) {
-      src = await getBase64(imageFile.originFileObj)
-    }
     if (!src && file.originFileObj) {
       src = await getBase64(file.originFileObj)
     }
@@ -160,10 +128,11 @@ export default function NewProductPage() {
       name: f.name,
       url: f.url,
       thumbUrl: f.thumbUrl,
-      status: f.status as any,
+      status: f.status,
     })),
     onPreview: handlePreview,
     onChange: handleFileChange,
+    customRequest: handleUpload,
     beforeUpload: (file: File) => {
       const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png'
       if (!isJpgOrPng) {
@@ -175,12 +144,12 @@ export default function NewProductPage() {
         message.error('图片大小不能超过 5MB!')
         return Upload.LIST_IGNORE
       }
-      return false
+      return true
     },
   }
 
   const onFinish = async (values: any) => {
-    const hasUploading = fileList.some(f => f.status === 'uploading') || uploadingUidsRef.current.size > 0
+    const hasUploading = fileList.some(f => f.status === 'uploading')
     if (hasUploading) {
       message.warning('图片正在上传中，请稍候...')
       return
@@ -244,7 +213,7 @@ export default function NewProductPage() {
       if (currentStep === 0) {
         await form.validateFields(['name', 'description'])
       } else if (currentStep === 1) {
-        const hasUploading = fileList.some(f => f.status === 'uploading') || uploadingUidsRef.current.size > 0
+        const hasUploading = fileList.some(f => f.status === 'uploading')
         if (hasUploading) {
           message.warning('图片正在上传中，请稍候...')
           return
@@ -430,7 +399,7 @@ export default function NewProductPage() {
                   </Upload>
                 </Form.Item>
 
-                {(fileList.some(f => f.status === 'uploading') || uploadingUidsRef.current.size > 0) && (
+                {fileList.some(f => f.status === 'uploading') && (
                   <Alert
                     message="图片正在上传中"
                     description={<span><LoadingOutlined spin /> 请等待所有图片上传完成后再点击下一步</span>}
