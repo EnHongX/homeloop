@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { uploadMultipleToOSS, UploadFolder } from '@/lib/oss'
 
 export async function GET() {
   try {
@@ -31,31 +30,39 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData()
+    const body = await request.json()
     
-    const name = formData.get('name') as string
-    const description = formData.get('description') as string
-    const price = parseFloat(formData.get('price') as string)
-    const originalPrice = formData.get('originalPrice') ? parseFloat(formData.get('originalPrice') as string) : null
-    const category = formData.get('category') as string
-    const condition = formData.get('condition') as string
-    const location = formData.get('location') as string
-    const contactInfo = formData.get('contactInfo') as string
-    const status = (formData.get('status') as string) || 'available'
+    const {
+      name,
+      description,
+      price,
+      originalPrice,
+      category,
+      condition,
+      location,
+      contactInfo,
+      status,
+      images,
+    } = body
 
-    const imageFiles = formData.getAll('images') as File[]
-    
-    let imageUrls: string[] = []
-    
-    if (imageFiles.length > 0 && imageFiles[0].size > 0) {
-      const filesToUpload = await Promise.all(
-        imageFiles.map(async (file) => ({
-          buffer: Buffer.from(await file.arrayBuffer()),
-          originalName: file.name,
-        }))
+    if (!name || !description || !price || !category || !condition || !location || !contactInfo) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '请填写所有必填字段',
+        },
+        { status: 400 }
       )
-      
-      imageUrls = await uploadMultipleToOSS(filesToUpload, UploadFolder.PRODUCTS)
+    }
+
+    if (!images || !Array.isArray(images) || images.length === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '请至少上传一张商品图片',
+        },
+        { status: 400 }
+      )
     }
 
     let categoryRecord = await prisma.category.findUnique({
@@ -72,14 +79,14 @@ export async function POST(request: NextRequest) {
       data: {
         name,
         description,
-        price,
-        originalPrice,
+        price: parseFloat(price),
+        originalPrice: originalPrice ? parseFloat(originalPrice) : null,
         categoryId: categoryRecord.id,
         condition,
-        images: imageUrls,
+        images,
         location,
         contactInfo,
-        status,
+        status: status || 'available',
       },
       include: {
         category: true,
