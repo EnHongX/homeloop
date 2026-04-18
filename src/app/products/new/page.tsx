@@ -1,8 +1,8 @@
 'use client'
 
-import { Layout, Typography, Button, Card, Row, Col, Form, Input, InputNumber, Select, Upload, Radio, Space, Breadcrumb, message, Divider, theme, Steps, Alert } from 'antd'
+import { Typography, Button, Card, Row, Col, Form, Input, InputNumber, Select, Upload, Radio, Space, Breadcrumb, message, Divider, theme, Steps, Alert } from 'antd'
 import Link from 'next/link'
-import { HomeOutlined, PlusOutlined, UploadOutlined, ArrowLeftOutlined, FileTextOutlined, PictureOutlined, TagOutlined, EnvironmentOutlined, PhoneOutlined, CheckCircleOutlined } from '@ant-design/icons'
+import { HomeOutlined, PlusOutlined, ArrowLeftOutlined, FileTextOutlined, PictureOutlined, TagOutlined, EnvironmentOutlined, PhoneOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import AppLayout from '@/components/AppLayout'
@@ -10,7 +10,6 @@ import AppLayout from '@/components/AppLayout'
 const { Title, Text } = Typography
 const { TextArea } = Input
 const { Option } = Select
-const { Step } = Steps
 
 const categories = ['沙发', '桌椅', '柜子', '床', '灯具', '装饰', '其他']
 const conditions = ['全新', '九成新', '八成新', '七成新及以下']
@@ -121,8 +120,14 @@ export default function NewProductPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        <Breadcrumb style={{ marginBottom: '24px', fontSize: '14px' }}>
+      <div
+        style={{
+          maxWidth: '900px',
+          margin: '0 auto',
+          padding: '24px 16px',
+        }}
+      >
+        <Breadcrumb style={{ marginBottom: '20px', fontSize: '14px' }}>
           <Breadcrumb.Item>
             <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <HomeOutlined />
@@ -135,15 +140,15 @@ export default function NewProductPage() {
           <Breadcrumb.Item>发布商品</Breadcrumb.Item>
         </Breadcrumb>
 
-        <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '28px' }}>
           <Title
             level={2}
             style={{
-              marginBottom: '8px',
-              fontSize: '28px',
+              marginBottom: '6px',
+              fontSize: '24px',
             }}
           >
-            <PlusOutlined style={{ marginRight: '12px', color: token.colorPrimary }} />
+            <PlusOutlined style={{ marginRight: '10px', color: token.colorPrimary }} />
             发布商品
           </Title>
           <Text type="secondary" style={{ fontSize: '14px' }}>
@@ -151,20 +156,24 @@ export default function NewProductPage() {
           </Text>
         </div>
 
-        <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '28px' }}>
           <Steps
             current={currentStep}
             items={steps}
             size="small"
             labelPlacement="horizontal"
-            style={{ background: token.colorBgContainer, padding: '24px', borderRadius: '12px' }}
+            style={{
+              background: token.colorBgContainer,
+              padding: '20px 16px',
+              borderRadius: '12px',
+            }}
           />
         </div>
 
         <Card
           bordered={false}
-          style={{ borderRadius: '16px' }}
-          bodyStyle={{ padding: '32px' }}
+          style={{ borderRadius: '12px' }}
+          bodyStyle={{ padding: '24px 20px' }}
         >
           <Form
             form={form}
@@ -218,7 +227,7 @@ export default function NewProductPage() {
                 >
                   <TextArea
                     placeholder="例如：2022年在宜家购买，使用了1年多，一直很爱惜，没有明显划痕。因搬家忍痛转让，尺寸160*80*75cm，适合3-4人使用。自提地址在朝阳区，有意者可私信看实物。"
-                    rows={8}
+                    rows={6}
                     style={{ borderRadius: '8px' }}
                     showCount
                     maxLength={2000}
@@ -246,14 +255,9 @@ export default function NewProductPage() {
                     </span>
                   }
                   rules={[{ required: true, message: '请上传商品图片' }]}
-                  extra="支持 JPG、PNG 格式，单张不超过 5MB，建议上传 3-9 张不同角度的照片（正面、侧面、细节、瑕疵等）"
+                  extra="支持 JPG、PNG 格式，单张不超过 5MB，建议上传 3-9 张不同角度的照片"
                 >
-                  <Upload
-                    {...uploadProps}
-                    multiple
-                    maxCount={9}
-                    listType="picture-card"
-                  >
+                  <Upload {...uploadProps} multiple maxCount={9} listType="picture-card">
                     {fileList.length >= 9 ? null : uploadButton}
                   </Upload>
                 </Form.Item>
@@ -334,7 +338,9 @@ export default function NewProductPage() {
                       label={
                         <span>
                           <Text strong>原价 (元)</Text>
-                          <Text type="secondary" style={{ marginLeft: '4px', fontSize: '12px' }}>(选填)</Text>
+                          <Text type="secondary" style={{ marginLeft: '4px', fontSize: '12px' }}>
+                            (选填)
+                          </Text>
                         </span>
                       }
                       extra="填写原价能让买家更直观地看到优惠幅度"
@@ -474,7 +480,6 @@ export default function NewProductPage() {
                       <Text type="secondary" style={{ fontSize: '13px', lineHeight: 1.8 }}>
                         请确保所有信息准确无误。发布后，您的商品将在平台上展示，
                         感兴趣的买家会通过您提供的联系方式与您联系。
-                        您也可以随时在商品详情页编辑或下架商品。
                       </Text>
                     </div>
                   </Space>
@@ -482,7 +487,7 @@ export default function NewProductPage() {
               </div>
             )}
 
-            <Divider style={{ margin: '32px 0 24px' }} />
+            <Divider style={{ margin: '28px 0 20px' }} />
 
             <Form.Item style={{ marginBottom: 0 }}>
               <Space style={{ width: '100%' }}>
@@ -499,10 +504,7 @@ export default function NewProductPage() {
 
                 <Space style={{ flex: 1, justifyContent: 'flex-end' }}>
                   <Link href="/products">
-                    <Button
-                      size="large"
-                      style={{ borderRadius: '8px', height: '44px', padding: '0 24px' }}
-                    >
+                    <Button size="large" style={{ borderRadius: '8px', height: '44px', padding: '0 24px' }}>
                       取消
                     </Button>
                   </Link>
@@ -512,7 +514,12 @@ export default function NewProductPage() {
                       type="primary"
                       size="large"
                       onClick={nextStep}
-                      style={{ borderRadius: '8px', height: '44px', padding: '0 24px', fontWeight: 500 }}
+                      style={{
+                        borderRadius: '8px',
+                        height: '44px',
+                        padding: '0 24px',
+                        fontWeight: 500,
+                      }}
                     >
                       下一步
                     </Button>
@@ -522,7 +529,12 @@ export default function NewProductPage() {
                       htmlType="submit"
                       size="large"
                       icon={<PlusOutlined />}
-                      style={{ borderRadius: '8px', height: '44px', padding: '0 24px', fontWeight: 500 }}
+                      style={{
+                        borderRadius: '8px',
+                        height: '44px',
+                        padding: '0 24px',
+                        fontWeight: 500,
+                      }}
                     >
                       发布商品
                     </Button>

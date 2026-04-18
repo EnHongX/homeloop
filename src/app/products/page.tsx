@@ -1,8 +1,8 @@
 'use client'
 
-import { Typography, Button, Card, Row, Col, Space, Tag, Input, Select, Pagination, theme, Empty, Result, Statistic, Divider } from 'antd'
+import { Typography, Button, Card, Row, Col, Space, Tag, Input, Select, Pagination, theme, Result, Statistic, Divider } from 'antd'
 import Link from 'next/link'
-import { PlusOutlined, HomeOutlined, ShoppingOutlined, SearchOutlined, FilterOutlined, EnvironmentOutlined, TagOutlined } from '@ant-design/icons'
+import { PlusOutlined, ShoppingOutlined, SearchOutlined, FilterOutlined, EnvironmentOutlined, TagOutlined } from '@ant-design/icons'
 import { useState } from 'react'
 import AppLayout from '@/components/AppLayout'
 
@@ -132,21 +132,26 @@ export default function ProductsPage() {
       <div
         style={{
           background: `linear-gradient(135deg, ${token.colorPrimaryBg} 0%, ${token.colorBgContainer} 100%)`,
-          padding: '40px 24px',
+          padding: '32px 16px',
           borderBottom: `1px solid ${token.colorBorder}`,
         }}
       >
-        <div className="max-w-7xl mx-auto">
+        <div
+          style={{
+            maxWidth: '1200px',
+            margin: '0 auto',
+          }}
+        >
           <Space direction="vertical" size="large" style={{ width: '100%' }}>
             <div>
               <Title
                 level={2}
                 style={{
-                  marginBottom: '8px',
-                  fontSize: '28px',
+                  marginBottom: '6px',
+                  fontSize: '24px',
                 }}
               >
-                <ShoppingOutlined style={{ marginRight: '12px', color: token.colorPrimary }} />
+                <ShoppingOutlined style={{ marginRight: '10px', color: token.colorPrimary }} />
                 浏览商品
               </Title>
               <Text type="secondary" style={{ fontSize: '14px' }}>
@@ -234,7 +239,13 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      <div
+        style={{
+          maxWidth: '1200px',
+          margin: '0 auto',
+          padding: '24px 16px',
+        }}
+      >
         <Row gutter={[16, 16]} align="middle" justify="space-between">
           <Col>
             <Space size="middle">
@@ -261,7 +272,13 @@ export default function ProductsPage() {
         </Row>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 pb-12">
+      <div
+        style={{
+          maxWidth: '1200px',
+          margin: '0 auto',
+          padding: '0 16px 48px',
+        }}
+      >
         {mockProducts.length > 0 ? (
           <>
             <Row gutter={[20, 20]}>
@@ -274,7 +291,6 @@ export default function ProductsPage() {
                       style={{
                         borderRadius: '12px',
                         overflow: 'hidden',
-                        transition: 'all 0.3s ease',
                       }}
                       bodyStyle={{
                         padding: '16px',
@@ -285,7 +301,7 @@ export default function ProductsPage() {
                             alt={product.name}
                             src={product.images[0]}
                             style={{
-                              height: '200px',
+                              height: '180px',
                               objectFit: 'cover',
                               width: '100%',
                             }}
@@ -403,7 +419,7 @@ export default function ProductsPage() {
               ))}
             </Row>
 
-            <div style={{ marginTop: '48px', textAlign: 'center' }}>
+            <div style={{ marginTop: '40px', textAlign: 'center' }}>
               <Pagination
                 current={currentPage}
                 onChange={(page) => setCurrentPage(page)}
@@ -417,7 +433,7 @@ export default function ProductsPage() {
             </div>
           </>
         ) : (
-          <div style={{ padding: '80px 0' }}>
+          <div style={{ padding: '80px 0', textAlign: 'center' }}>
             <Result
               status="info"
               icon={<ShoppingOutlined />}
@@ -425,11 +441,14 @@ export default function ProductsPage() {
               subTitle="尝试调整筛选条件或搜索关键词"
               extra={
                 <Space>
-                  <Button type="primary" onClick={() => {
-                    setSearchText('')
-                    setSelectedCategory('全部')
-                    setSelectedCondition('全部')
-                  }}>
+                  <Button
+                    type="primary"
+                    onClick={() => {
+                      setSearchText('')
+                      setSelectedCategory('全部')
+                      setSelectedCondition('全部')
+                    }}
+                  >
                     重置筛选
                   </Button>
                   <Link href="/products/new">
