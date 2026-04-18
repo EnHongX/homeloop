@@ -4,7 +4,7 @@ import { Typography, Button, Card, Row, Col, Form, Input, InputNumber, Select, U
 import Link from 'next/link'
 import { HomeOutlined, PlusOutlined, ArrowLeftOutlined, FileTextOutlined, PictureOutlined, TagOutlined, EnvironmentOutlined, PhoneOutlined, CheckCircleOutlined, LoadingOutlined } from '@ant-design/icons'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import AppLayout from '@/components/AppLayout'
 
 const getBase64 = (file: File): Promise<string> =>
@@ -22,11 +22,14 @@ const { Option } = Select
 const categories = ['沙发', '桌椅', '柜子', '床', '灯具', '装饰', '其他']
 const conditions = ['全新', '九成新', '八成新', '七成新及以下']
 
-interface UploadedImage {
+interface ImageFile {
   uid: string
   name: string
   url: string
+  thumbUrl?: string
   status: 'uploading' | 'done' | 'error'
+  ossUrl?: string
+  originFileObj?: File
 }
 
 export default function NewProductPage() {
@@ -34,8 +37,9 @@ export default function NewProductPage() {
   const [form] = Form.useForm()
   const { token } = theme.useToken()
   const [currentStep, setCurrentStep] = useState(0)
-  const [fileList, setFileList] = useState<UploadedImage[]>([])
+  const [fileList, setFileList] = useState<ImageFile[]>([])
   const [loading, setLoading] = useState(false)
+  const uploadingUidsRef = useRef<Set<string>>(new Set())
 
   const steps = [
     {
@@ -60,7 +64,7 @@ export default function NewProductPage() {
     },
   ]
 
-  const uploadImage = async (file: File, uid: string): Promise<string | null> => {
+  const uploadImageToOSS = async (file: File, uid: string): Promise<string | null> => {
     try {
       const formData = new FormData()
       formData.append('file', file)
@@ -84,70 +88,68 @@ export default function NewProductPage() {
     }
   }
 
-  const handleUploadChange = async (info: any) => {
+  const handleFileChange = async (info: any) => {
     const { file, fileList: newFileList } = info
 
-    if (file.status === 'uploading') {
-      setFileList(newFileList.map((f: any) => ({
+    const updatedList: ImageFile[] = newFileList.map((f: any) => {
+      const existing = fileList.find(item => item.uid === f.uid)
+      return {
         uid: f.uid,
         name: f.name,
-        url: f.thumbUrl || f.url,
-        status: 'uploading' as const,
-      })))
-      return
-    }
-
-    if (file.status === 'done') {
-      return
-    }
-
-    if (file.originFileObj) {
-      const updatedList = [...newFileList]
-      const fileIndex = updatedList.findIndex((f: any) => f.uid === file.uid)
-      
-      if (fileIndex !== -1) {
-        updatedList[fileIndex] = {
-          ...updatedList[fileIndex],
-          status: 'uploading',
-        }
-        setFileList(updatedList.map((f: any) => ({
-          uid: f.uid,
-          name: f.name,
-          url: f.thumbUrl || f.url,
-          status: f.status || 'done',
-        })))
-
-        const url = await uploadImage(file.originFileObj, file.uid)
-
-        if (url) {
-          const finalList = [...updatedList]
-          finalList[fileIndex] = {
-            uid: file.uid,
-            name: file.name,
-            url: url,
-            status: 'done',
-          }
-          setFileList(finalList)
-          message.success('图片上传成功')
-        } else {
-          const errorList = [...updatedList]
-          errorList[fileIndex] = {
-            uid: file.uid,
-            name: file.name,
-            url: file.thumbUrl || '',
-            status: 'error',
-          }
-          setFileList(errorList)
-          message.error('图片上传失败，请重试')
-        }
+        url: f.url || f.thumbUrl || existing?.url || '',
+        thumbUrl: f.thumbUrl || existing?.thumbUrl,
+        status: existing?.status || 'uploading',
+        ossUrl: existing?.ossUrl,
+        originFileObj: f.originFileObj || existing?.originFileObj,
       }
-    } else {
-      setFileList(newFileList.map((f: any) => ({
-        uid: f.uid,
-        name: f.name,
-        url: f.url || f.thumbUrl,
-        status: f.status || 'done',
-      })))
+    })
+
+    setFileList(updatedList)
+
+    if (file.status === 'removed') {
+      uploadingUidsRef.current.delete(file.uid)
+      return
+    }
+
+    if (file.originFileObj && !uploadingUidsRef.current.has(file.uid)) {
+      uploadingUidsRef.current.add(file.uid)
+
+      setFileList(prev => prev.map(f => 
+        f.uid === file.uid ? { ...f, status: 'uploading' } : f
+      ))
+
+      const ossUrl = await uploadImageToOSS(file.originFileObj, file.uid)
+
+      uploadingUidsRef.current.delete(file.uid)
+
+      if (ossUrl) {
+        setFileList(prev => prev.map(f => 
+          f.uid === file.uid ? { ...f, status: 'done', ossUrl, url: ossUrl } : f
+        ))
+        message.success('图片上传成功')
+      } else {
+        setFileList(prev => prev.map(f => 
+          f.uid === file.uid ? { ...f, status: 'error' } : f
+        ))
+        message.error('图片上传失败，请重试')
+      }
+    }
+  }
+
+  const handlePreview = async (file: any) => {
+    const imageFile = fileList.find(f => f.uid === file.uid)
+    let src = imageFile?.ossUrl || imageFile?.url || file.url
+    if (!src && imageFile?.originFileObj) {
+      src = await getBase64(imageFile.originFileObj)
+    }
+    if (!src && file.originFileObj) {
+      src = await getBase64(file.originFileObj)
+    }
+    if (src) {
+      const image = new Image()
+      image.src = src
+      const imgWindow = window.open(src)
+      imgWindow?.document.write(image.outerHTML)
     }
   }
 
@@ -157,22 +159,12 @@ export default function NewProductPage() {
       uid: f.uid,
       name: f.name,
       url: f.url,
-      status: f.status,
+      thumbUrl: f.thumbUrl,
+      status: f.status as any,
     })),
-    onPreview: async (file: any) => {
-      let src = file.url
-      if (!src && file.originFileObj) {
-        src = await getBase64(file.originFileObj as File)
-      }
-      if (src) {
-        const image = new Image()
-        image.src = src
-        const imgWindow = window.open(src)
-        imgWindow?.document.write(image.outerHTML)
-      }
-    },
-    onChange: handleUploadChange,
-    beforeUpload: async (file: File) => {
+    onPreview: handlePreview,
+    onChange: handleFileChange,
+    beforeUpload: (file: File) => {
       const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png'
       if (!isJpgOrPng) {
         message.error('只能上传 JPG/PNG 格式的图片!')
@@ -185,23 +177,22 @@ export default function NewProductPage() {
       }
       return false
     },
-    customRequest: () => {},
   }
 
   const onFinish = async (values: any) => {
-    const uploadingImages = fileList.filter(f => f.status === 'uploading')
-    if (uploadingImages.length > 0) {
+    const hasUploading = fileList.some(f => f.status === 'uploading') || uploadingUidsRef.current.size > 0
+    if (hasUploading) {
       message.warning('图片正在上传中，请稍候...')
       return
     }
 
-    const errorImages = fileList.filter(f => f.status === 'error')
-    if (errorImages.length > 0) {
+    const hasError = fileList.some(f => f.status === 'error')
+    if (hasError) {
       message.error('有图片上传失败，请删除或重新上传')
       return
     }
 
-    const uploadedImages = fileList.filter(f => f.status === 'done' && f.url)
+    const uploadedImages = fileList.filter(f => f.status === 'done' && f.ossUrl)
     if (uploadedImages.length === 0) {
       message.error('请至少上传一张商品图片')
       return
@@ -209,7 +200,7 @@ export default function NewProductPage() {
 
     setLoading(true)
     try {
-      const imageUrls = uploadedImages.map(f => f.url)
+      const imageUrls = uploadedImages.map(f => f.ossUrl!)
 
       const productData = {
         name: values.name,
@@ -253,18 +244,26 @@ export default function NewProductPage() {
       if (currentStep === 0) {
         await form.validateFields(['name', 'description'])
       } else if (currentStep === 1) {
-        const uploadingImages = fileList.filter(f => f.status === 'uploading')
-        if (uploadingImages.length > 0) {
+        const hasUploading = fileList.some(f => f.status === 'uploading') || uploadingUidsRef.current.size > 0
+        if (hasUploading) {
           message.warning('图片正在上传中，请稍候...')
           return
         }
+
         if (fileList.length === 0) {
           message.warning('请至少上传一张商品图片')
           return
         }
-        const errorImages = fileList.filter(f => f.status === 'error')
-        if (errorImages.length > 0) {
+
+        const hasError = fileList.some(f => f.status === 'error')
+        if (hasError) {
           message.error('有图片上传失败，请删除或重新上传')
+          return
+        }
+
+        const hasUploaded = fileList.some(f => f.status === 'done' && f.ossUrl)
+        if (!hasUploaded) {
+          message.error('没有成功上传的图片，请重新上传')
           return
         }
       } else if (currentStep === 2) {
@@ -431,11 +430,21 @@ export default function NewProductPage() {
                   </Upload>
                 </Form.Item>
 
-                {fileList.some(f => f.status === 'uploading') && (
+                {(fileList.some(f => f.status === 'uploading') || uploadingUidsRef.current.size > 0) && (
                   <Alert
                     message="图片正在上传中"
                     description={<span><LoadingOutlined spin /> 请等待所有图片上传完成后再点击下一步</span>}
                     type="warning"
+                    showIcon
+                    style={{ marginBottom: '24px', borderRadius: '8px' }}
+                  />
+                )}
+
+                {fileList.some(f => f.status === 'error') && (
+                  <Alert
+                    message="有图片上传失败"
+                    description="请删除失败的图片后重新上传"
+                    type="error"
                     showIcon
                     style={{ marginBottom: '24px', borderRadius: '8px' }}
                   />
