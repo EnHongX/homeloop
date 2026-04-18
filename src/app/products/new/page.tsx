@@ -2,7 +2,7 @@
 
 import { Typography, Button, Card, Row, Col, Form, Input, InputNumber, Select, Upload, Radio, Space, Breadcrumb, message, Divider, theme, Steps, Alert } from 'antd'
 import Link from 'next/link'
-import { HomeOutlined, PlusOutlined, ArrowLeftOutlined, FileTextOutlined, PictureOutlined, TagOutlined, EnvironmentOutlined, PhoneOutlined, CheckCircleOutlined } from '@ant-design/icons'
+import { HomeOutlined, PlusOutlined, ArrowLeftOutlined, FileTextOutlined, PictureOutlined, TagOutlined, EnvironmentOutlined, PhoneOutlined, CheckCircleOutlined, LoadingOutlined } from '@ant-design/icons'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import AppLayout from '@/components/AppLayout'
@@ -22,12 +22,19 @@ const { Option } = Select
 const categories = ['沙发', '桌椅', '柜子', '床', '灯具', '装饰', '其他']
 const conditions = ['全新', '九成新', '八成新', '七成新及以下']
 
+interface UploadedImage {
+  uid: string
+  name: string
+  url: string
+  status: 'uploading' | 'done' | 'error'
+}
+
 export default function NewProductPage() {
   const router = useRouter()
   const [form] = Form.useForm()
   const { token } = theme.useToken()
   const [currentStep, setCurrentStep] = useState(0)
-  const [fileList, setFileList] = useState<any[]>([])
+  const [fileList, setFileList] = useState<UploadedImage[]>([])
   const [loading, setLoading] = useState(false)
 
   const steps = [
@@ -53,22 +60,118 @@ export default function NewProductPage() {
     },
   ]
 
+  const uploadImage = async (file: File, uid: string): Promise<string | null> => {
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('folder', 'products')
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        return result.data.url
+      } else {
+        throw new Error(result.error || '上传失败')
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error)
+      return null
+    }
+  }
+
+  const handleUploadChange = async (info: any) => {
+    const { file, fileList: newFileList } = info
+
+    if (file.status === 'uploading') {
+      setFileList(newFileList.map((f: any) => ({
+        uid: f.uid,
+        name: f.name,
+        url: f.thumbUrl || f.url,
+        status: 'uploading' as const,
+      })))
+      return
+    }
+
+    if (file.status === 'done') {
+      return
+    }
+
+    if (file.originFileObj) {
+      const updatedList = [...newFileList]
+      const fileIndex = updatedList.findIndex((f: any) => f.uid === file.uid)
+      
+      if (fileIndex !== -1) {
+        updatedList[fileIndex] = {
+          ...updatedList[fileIndex],
+          status: 'uploading',
+        }
+        setFileList(updatedList.map((f: any) => ({
+          uid: f.uid,
+          name: f.name,
+          url: f.thumbUrl || f.url,
+          status: f.status || 'done',
+        })))
+
+        const url = await uploadImage(file.originFileObj, file.uid)
+
+        if (url) {
+          const finalList = [...updatedList]
+          finalList[fileIndex] = {
+            uid: file.uid,
+            name: file.name,
+            url: url,
+            status: 'done',
+          }
+          setFileList(finalList)
+          message.success('图片上传成功')
+        } else {
+          const errorList = [...updatedList]
+          errorList[fileIndex] = {
+            uid: file.uid,
+            name: file.name,
+            url: file.thumbUrl || '',
+            status: 'error',
+          }
+          setFileList(errorList)
+          message.error('图片上传失败，请重试')
+        }
+      }
+    } else {
+      setFileList(newFileList.map((f: any) => ({
+        uid: f.uid,
+        name: f.name,
+        url: f.url || f.thumbUrl,
+        status: f.status || 'done',
+      })))
+    }
+  }
+
   const uploadProps = {
     listType: 'picture-card' as const,
-    fileList,
+    fileList: fileList.map(f => ({
+      uid: f.uid,
+      name: f.name,
+      url: f.url,
+      status: f.status,
+    })),
     onPreview: async (file: any) => {
       let src = file.url
-      if (!src) {
+      if (!src && file.originFileObj) {
         src = await getBase64(file.originFileObj as File)
       }
-      const image = new Image()
-      image.src = src
-      const imgWindow = window.open(src)
-      imgWindow?.document.write(image.outerHTML)
+      if (src) {
+        const image = new Image()
+        image.src = src
+        const imgWindow = window.open(src)
+        imgWindow?.document.write(image.outerHTML)
+      }
     },
-    onChange: ({ fileList: newFileList }: any) => {
-      setFileList(newFileList)
-    },
+    onChange: handleUploadChange,
     beforeUpload: async (file: File) => {
       const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png'
       if (!isJpgOrPng) {
@@ -82,34 +185,51 @@ export default function NewProductPage() {
       }
       return false
     },
+    customRequest: () => {},
   }
 
   const onFinish = async (values: any) => {
+    const uploadingImages = fileList.filter(f => f.status === 'uploading')
+    if (uploadingImages.length > 0) {
+      message.warning('图片正在上传中，请稍候...')
+      return
+    }
+
+    const errorImages = fileList.filter(f => f.status === 'error')
+    if (errorImages.length > 0) {
+      message.error('有图片上传失败，请删除或重新上传')
+      return
+    }
+
+    const uploadedImages = fileList.filter(f => f.status === 'done' && f.url)
+    if (uploadedImages.length === 0) {
+      message.error('请至少上传一张商品图片')
+      return
+    }
+
     setLoading(true)
     try {
-      const formData = new FormData()
-      
-      formData.append('name', values.name)
-      formData.append('description', values.description)
-      formData.append('price', values.price.toString())
-      if (values.originalPrice) {
-        formData.append('originalPrice', values.originalPrice.toString())
-      }
-      formData.append('category', values.category)
-      formData.append('condition', values.condition)
-      formData.append('location', values.location)
-      formData.append('contactInfo', values.contactInfo)
-      formData.append('status', values.status || 'available')
+      const imageUrls = uploadedImages.map(f => f.url)
 
-      fileList.forEach((file) => {
-        if (file.originFileObj) {
-          formData.append('images', file.originFileObj)
-        }
-      })
+      const productData = {
+        name: values.name,
+        description: values.description,
+        price: values.price,
+        originalPrice: values.originalPrice || null,
+        category: values.category,
+        condition: values.condition,
+        location: values.location,
+        contactInfo: values.contactInfo,
+        status: values.status || 'available',
+        images: imageUrls,
+      }
 
       const response = await fetch('/api/products', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(productData),
       })
 
       const result = await response.json()
@@ -133,8 +253,18 @@ export default function NewProductPage() {
       if (currentStep === 0) {
         await form.validateFields(['name', 'description'])
       } else if (currentStep === 1) {
+        const uploadingImages = fileList.filter(f => f.status === 'uploading')
+        if (uploadingImages.length > 0) {
+          message.warning('图片正在上传中，请稍候...')
+          return
+        }
         if (fileList.length === 0) {
           message.warning('请至少上传一张商品图片')
+          return
+        }
+        const errorImages = fileList.filter(f => f.status === 'error')
+        if (errorImages.length > 0) {
+          message.error('有图片上传失败，请删除或重新上传')
           return
         }
       } else if (currentStep === 2) {
@@ -279,7 +409,7 @@ export default function NewProductPage() {
               <div>
                 <Alert
                   message="上传商品图片"
-                  description="高质量的图片能显著提高商品的吸引力和成交率"
+                  description="图片将自动上传到阿里云OSS，请等待上传完成后再继续"
                   type="info"
                   showIcon
                   style={{ marginBottom: '24px', borderRadius: '8px' }}
@@ -300,6 +430,16 @@ export default function NewProductPage() {
                     {fileList.length >= 9 ? null : uploadButton}
                   </Upload>
                 </Form.Item>
+
+                {fileList.some(f => f.status === 'uploading') && (
+                  <Alert
+                    message="图片正在上传中"
+                    description={<span><LoadingOutlined spin /> 请等待所有图片上传完成后再点击下一步</span>}
+                    type="warning"
+                    showIcon
+                    style={{ marginBottom: '24px', borderRadius: '8px' }}
+                  />
+                )}
 
                 <Row gutter={[16, 16]}>
                   <Col xs={24} sm={12}>
