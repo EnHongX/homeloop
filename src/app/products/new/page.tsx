@@ -106,17 +106,18 @@ export default function NewProductPage() {
     const updatedList: ImageFile[] = newFileList.map((f: any) => {
       const ossUrl = f.response?.ossUrl || f.response?.url || f.ossUrl
       console.log(`File ${f.name}: status=${f.status}, ossUrl=${ossUrl}`)
+      const finalUrl = ossUrl || f.url || f.thumbUrl || ''
       return {
         uid: f.uid,
         name: f.name,
-        url: f.url || f.thumbUrl || ossUrl || '',
-        thumbUrl: f.thumbUrl,
+        url: finalUrl,
+        thumbUrl: finalUrl || f.thumbUrl,
         status: f.status,
         ossUrl: ossUrl,
       }
     })
 
-    console.log('Updated fileList:', updatedList.map(f => ({ name: f.name, status: f.status, ossUrl: f.ossUrl })))
+    console.log('Updated fileList:', updatedList.map(f => ({ name: f.name, status: f.status, ossUrl: f.ossUrl, thumbUrl: f.thumbUrl })))
     setFileList(updatedList)
   }
 
@@ -147,16 +148,31 @@ export default function NewProductPage() {
     onChange: handleFileChange,
     customRequest: handleUpload,
     beforeUpload: (file: File) => {
-      const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png'
-      if (!isJpgOrPng) {
-        message.error('只能上传 JPG/PNG 格式的图片!')
+      if (fileList.length >= 9) {
+        message.error('最多只能上传 9 张图片!')
         return Upload.LIST_IGNORE
       }
+
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
+      const isAllowedType = allowedTypes.includes(file.type)
+
+      if (!isAllowedType) {
+        const fileName = file.name.toLowerCase()
+        const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif']
+        const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext))
+        
+        if (!hasValidExtension) {
+          message.error('只能上传 JPG、PNG、WebP、GIF 格式的图片!')
+          return Upload.LIST_IGNORE
+        }
+      }
+
       const isLt5M = file.size / 1024 / 1024 < 5
       if (!isLt5M) {
         message.error('图片大小不能超过 5MB!')
         return Upload.LIST_IGNORE
       }
+
       return true
     },
   }
@@ -343,327 +359,319 @@ export default function NewProductPage() {
             }}
             size="large"
           >
-            {currentStep === 0 && (
-              <div>
+            <div style={{ display: currentStep === 0 ? 'block' : 'none' }}>
+              <Alert
+                message="填写商品基本信息"
+                description="好的标题和详细的描述能帮助您的商品更快卖出"
+                type="info"
+                showIcon
+                style={{ marginBottom: '24px', borderRadius: '8px' }}
+              />
+
+              <Form.Item
+                name="name"
+                label={
+                  <span>
+                    <Text strong>商品名称</Text>
+                    <Text type="danger" style={{ marginLeft: '4px' }}>*</Text>
+                  </span>
+                }
+                rules={[{ required: true, message: '请输入商品名称' }]}
+                extra="建议包含品牌、材质、型号等关键信息，例如：宜家实木餐桌 1.6米"
+              >
+                <Input
+                  placeholder="请输入商品名称，如：实木餐桌、布艺沙发"
+                  style={{ borderRadius: '8px', height: '44px' }}
+                  maxLength={50}
+                  showCount
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="description"
+                label={
+                  <span>
+                    <Text strong>商品描述</Text>
+                    <Text type="danger" style={{ marginLeft: '4px' }}>*</Text>
+                  </span>
+                }
+                rules={[{ required: true, message: '请输入商品描述' }]}
+                extra="请详细描述：使用时长、购买渠道、有无瑕疵、转让原因、尺寸规格等"
+              >
+                <TextArea
+                  placeholder="例如：2022年在宜家购买，使用了1年多，一直很爱惜，没有明显划痕。因搬家忍痛转让，尺寸160*80*75cm，适合3-4人使用。自提地址在朝阳区，有意者可私信看实物。"
+                  rows={6}
+                  style={{ borderRadius: '8px' }}
+                  showCount
+                  maxLength={2000}
+                />
+              </Form.Item>
+            </div>
+
+            <div style={{ display: currentStep === 1 ? 'block' : 'none' }}>
+              <Alert
+                message="上传商品图片"
+                description="图片将自动上传到阿里云OSS，请等待上传完成后再继续"
+                type="info"
+                showIcon
+                style={{ marginBottom: '24px', borderRadius: '8px' }}
+              />
+
+              <Form.Item
+                name="images"
+                label={
+                  <span>
+                    <Text strong>商品图片</Text>
+                    <Text type="danger" style={{ marginLeft: '4px' }}>*</Text>
+                  </span>
+                }
+                rules={[{ required: true, message: '请上传商品图片' }]}
+                extra="支持 JPG、PNG、WebP 格式，单张不超过 5MB，最多上传 9 张照片"
+              >
+                <Upload {...uploadProps} multiple maxCount={9} listType="picture-card">
+                  {fileList.length >= 9 ? null : uploadButton}
+                </Upload>
+              </Form.Item>
+
+              {fileList.some(f => f.status === 'uploading') && (
                 <Alert
-                  message="填写商品基本信息"
-                  description="好的标题和详细的描述能帮助您的商品更快卖出"
-                  type="info"
+                  message="图片正在上传中"
+                  description={<span><LoadingOutlined spin /> 请等待所有图片上传完成后再点击下一步</span>}
+                  type="warning"
                   showIcon
                   style={{ marginBottom: '24px', borderRadius: '8px' }}
                 />
+              )}
 
-                <Form.Item
-                  name="name"
-                  label={
-                    <span>
-                      <Text strong>商品名称</Text>
-                      <Text type="danger" style={{ marginLeft: '4px' }}>*</Text>
-                    </span>
-                  }
-                  rules={[{ required: true, message: '请输入商品名称' }]}
-                  extra="建议包含品牌、材质、型号等关键信息，例如：宜家实木餐桌 1.6米"
-                >
-                  <Input
-                    placeholder="请输入商品名称，如：实木餐桌、布艺沙发"
-                    style={{ borderRadius: '8px', height: '44px' }}
-                    maxLength={50}
-                    showCount
-                  />
-                </Form.Item>
-
-                <Form.Item
-                  name="description"
-                  label={
-                    <span>
-                      <Text strong>商品描述</Text>
-                      <Text type="danger" style={{ marginLeft: '4px' }}>*</Text>
-                    </span>
-                  }
-                  rules={[{ required: true, message: '请输入商品描述' }]}
-                  extra="请详细描述：使用时长、购买渠道、有无瑕疵、转让原因、尺寸规格等"
-                >
-                  <TextArea
-                    placeholder="例如：2022年在宜家购买，使用了1年多，一直很爱惜，没有明显划痕。因搬家忍痛转让，尺寸160*80*75cm，适合3-4人使用。自提地址在朝阳区，有意者可私信看实物。"
-                    rows={6}
-                    style={{ borderRadius: '8px' }}
-                    showCount
-                    maxLength={2000}
-                  />
-                </Form.Item>
-              </div>
-            )}
-
-            {currentStep === 1 && (
-              <div>
+              {fileList.some(f => f.status === 'error') && (
                 <Alert
-                  message="上传商品图片"
-                  description="图片将自动上传到阿里云OSS，请等待上传完成后再继续"
-                  type="info"
+                  message="有图片上传失败"
+                  description="请删除失败的图片后重新上传"
+                  type="error"
                   showIcon
                   style={{ marginBottom: '24px', borderRadius: '8px' }}
                 />
+              )}
 
-                <Form.Item
-                  name="images"
-                  label={
-                    <span>
-                      <Text strong>商品图片</Text>
-                      <Text type="danger" style={{ marginLeft: '4px' }}>*</Text>
-                    </span>
-                  }
-                  rules={[{ required: true, message: '请上传商品图片' }]}
-                  extra="支持 JPG、PNG 格式，单张不超过 5MB，建议上传 3-9 张不同角度的照片"
-                >
-                  <Upload {...uploadProps} multiple maxCount={9} listType="picture-card">
-                    {fileList.length >= 9 ? null : uploadButton}
-                  </Upload>
-                </Form.Item>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={12}>
+                  <Card
+                    size="small"
+                    style={{ borderRadius: '8px', background: token.colorBgElevated }}
+                  >
+                    <Text strong style={{ display: 'block', marginBottom: '8px' }}>
+                      💡 拍照建议
+                    </Text>
+                    <Text type="secondary" style={{ fontSize: '13px', lineHeight: 1.8 }}>
+                      • 光线充足时拍摄，避免逆光<br />
+                      • 多角度拍摄：正面、侧面、顶部<br />
+                      • 拍摄细节：品牌logo、材质纹理<br />
+                      • 如有瑕疵请如实拍摄
+                    </Text>
+                  </Card>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Card
+                    size="small"
+                    style={{ borderRadius: '8px', background: token.colorBgElevated }}
+                  >
+                    <Text strong style={{ display: 'block', marginBottom: '8px' }}>
+                      ⚠️ 注意事项
+                    </Text>
+                    <Text type="secondary" style={{ fontSize: '13px', lineHeight: 1.8 }}>
+                      • 图片中请勿包含联系方式<br />
+                      • 请勿上传网络盗图<br />
+                      • 保证图片与实物一致<br />
+                      • 违规图片将被删除
+                    </Text>
+                  </Card>
+                </Col>
+              </Row>
+            </div>
 
-                {fileList.some(f => f.status === 'uploading') && (
-                  <Alert
-                    message="图片正在上传中"
-                    description={<span><LoadingOutlined spin /> 请等待所有图片上传完成后再点击下一步</span>}
-                    type="warning"
-                    showIcon
-                    style={{ marginBottom: '24px', borderRadius: '8px' }}
-                  />
-                )}
+            <div style={{ display: currentStep === 2 ? 'block' : 'none' }}>
+              <Alert
+                message="设置价格和分类"
+                description="合理的定价和准确的分类能让更多人找到您的商品"
+                type="info"
+                showIcon
+                style={{ marginBottom: '24px', borderRadius: '8px' }}
+              />
 
-                {fileList.some(f => f.status === 'error') && (
-                  <Alert
-                    message="有图片上传失败"
-                    description="请删除失败的图片后重新上传"
-                    type="error"
-                    showIcon
-                    style={{ marginBottom: '24px', borderRadius: '8px' }}
-                  />
-                )}
+              <Row gutter={[20, 20]}>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="price"
+                    label={
+                      <span>
+                        <Text strong>售价 (元)</Text>
+                        <Text type="danger" style={{ marginLeft: '4px' }}>*</Text>
+                      </span>
+                    }
+                    rules={[{ required: true, message: '请输入售价' }]}
+                    extra="建议参考同类商品的价格"
+                  >
+                    <InputNumber
+                      placeholder="请输入售价"
+                      min={0}
+                      precision={2}
+                      style={{ width: '100%', height: '44px', borderRadius: '8px' }}
+                      prefix="¥"
+                      size="large"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="originalPrice"
+                    label={
+                      <span>
+                        <Text strong>原价 (元)</Text>
+                        <Text type="secondary" style={{ marginLeft: '4px', fontSize: '12px' }}>
+                          (选填)
+                        </Text>
+                      </span>
+                    }
+                    extra="填写原价能让买家更直观地看到优惠幅度"
+                  >
+                    <InputNumber
+                      placeholder="请输入原价"
+                      min={0}
+                      precision={2}
+                      style={{ width: '100%', height: '44px', borderRadius: '8px' }}
+                      prefix="¥"
+                      size="large"
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
 
-                <Row gutter={[16, 16]}>
-                  <Col xs={24} sm={12}>
-                    <Card
-                      size="small"
-                      style={{ borderRadius: '8px', background: token.colorBgElevated }}
-                    >
-                      <Text strong style={{ display: 'block', marginBottom: '8px' }}>
-                        💡 拍照建议
-                      </Text>
-                      <Text type="secondary" style={{ fontSize: '13px', lineHeight: 1.8 }}>
-                        • 光线充足时拍摄，避免逆光<br />
-                        • 多角度拍摄：正面、侧面、顶部<br />
-                        • 拍摄细节：品牌logo、材质纹理<br />
-                        • 如有瑕疵请如实拍摄
-                      </Text>
-                    </Card>
-                  </Col>
-                  <Col xs={24} sm={12}>
-                    <Card
-                      size="small"
-                      style={{ borderRadius: '8px', background: token.colorBgElevated }}
-                    >
-                      <Text strong style={{ display: 'block', marginBottom: '8px' }}>
-                        ⚠️ 注意事项
-                      </Text>
-                      <Text type="secondary" style={{ fontSize: '13px', lineHeight: 1.8 }}>
-                        • 图片中请勿包含联系方式<br />
-                        • 请勿上传网络盗图<br />
-                        • 保证图片与实物一致<br />
-                        • 违规图片将被删除
-                      </Text>
-                    </Card>
-                  </Col>
-                </Row>
-              </div>
-            )}
+              <Row gutter={[20, 20]}>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="category"
+                    label={
+                      <span>
+                        <Text strong>商品分类</Text>
+                        <Text type="danger" style={{ marginLeft: '4px' }}>*</Text>
+                      </span>
+                    }
+                    rules={[{ required: true, message: '请选择商品分类' }]}
+                  >
+                    <Select
+                      placeholder="请选择商品分类"
+                      style={{ borderRadius: '8px', height: '44px' }}
+                      size="large"
+                      options={categories.map((cat) => ({ label: cat, value: cat }))}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="condition"
+                    label={
+                      <span>
+                        <Text strong>新旧程度</Text>
+                        <Text type="danger" style={{ marginLeft: '4px' }}>*</Text>
+                      </span>
+                    }
+                    rules={[{ required: true, message: '请选择新旧程度' }]}
+                  >
+                    <Select
+                      placeholder="请选择新旧程度"
+                      style={{ borderRadius: '8px', height: '44px' }}
+                      size="large"
+                      options={conditions.map((cond) => ({ label: cond, value: cond }))}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </div>
 
-            {currentStep === 2 && (
-              <div>
-                <Alert
-                  message="设置价格和分类"
-                  description="合理的定价和准确的分类能让更多人找到您的商品"
-                  type="info"
-                  showIcon
-                  style={{ marginBottom: '24px', borderRadius: '8px' }}
-                />
+            <div style={{ display: currentStep === 3 ? 'block' : 'none' }}>
+              <Alert
+                message="填写交易信息"
+                description="准确的联系方式和位置信息能帮助买家更快联系到您"
+                type="info"
+                showIcon
+                style={{ marginBottom: '24px', borderRadius: '8px' }}
+              />
 
-                <Row gutter={[20, 20]}>
-                  <Col xs={24} md={12}>
-                    <Form.Item
-                      name="price"
-                      label={
-                        <span>
-                          <Text strong>售价 (元)</Text>
-                          <Text type="danger" style={{ marginLeft: '4px' }}>*</Text>
-                        </span>
-                      }
-                      rules={[{ required: true, message: '请输入售价' }]}
-                      extra="建议参考同类商品的价格"
-                    >
-                      <InputNumber
-                        placeholder="请输入售价"
-                        min={0}
-                        precision={2}
-                        style={{ width: '100%', height: '44px', borderRadius: '8px' }}
-                        prefix="¥"
-                        size="large"
-                      />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} md={12}>
-                    <Form.Item
-                      name="originalPrice"
-                      label={
-                        <span>
-                          <Text strong>原价 (元)</Text>
-                          <Text type="secondary" style={{ marginLeft: '4px', fontSize: '12px' }}>
-                            (选填)
-                          </Text>
-                        </span>
-                      }
-                      extra="填写原价能让买家更直观地看到优惠幅度"
-                    >
-                      <InputNumber
-                        placeholder="请输入原价"
-                        min={0}
-                        precision={2}
-                        style={{ width: '100%', height: '44px', borderRadius: '8px' }}
-                        prefix="¥"
-                        size="large"
-                      />
-                    </Form.Item>
-                  </Col>
-                </Row>
+              <Row gutter={[20, 20]}>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="location"
+                    label={
+                      <span>
+                        <Text strong>所在地区</Text>
+                        <Text type="danger" style={{ marginLeft: '4px' }}>*</Text>
+                      </span>
+                    }
+                    rules={[{ required: true, message: '请输入所在地区' }]}
+                    extra="建议填写到区县一级，如：北京市朝阳区"
+                  >
+                    <Input
+                      placeholder="如：北京市朝阳区、上海市浦东新区"
+                      style={{ borderRadius: '8px', height: '44px' }}
+                      prefix={<EnvironmentOutlined style={{ color: token.colorTextSecondary }} />}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="contactInfo"
+                    label={
+                      <span>
+                        <Text strong>联系方式</Text>
+                        <Text type="danger" style={{ marginLeft: '4px' }}>*</Text>
+                      </span>
+                    }
+                    rules={[{ required: true, message: '请输入联系方式' }]}
+                    extra="手机号码或微信号，方便买家联系您"
+                  >
+                    <Input
+                      placeholder="手机号码或微信号"
+                      style={{ borderRadius: '8px', height: '44px' }}
+                      prefix={<PhoneOutlined style={{ color: token.colorTextSecondary }} />}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
 
-                <Row gutter={[20, 20]}>
-                  <Col xs={24} md={12}>
-                    <Form.Item
-                      name="category"
-                      label={
-                        <span>
-                          <Text strong>商品分类</Text>
-                          <Text type="danger" style={{ marginLeft: '4px' }}>*</Text>
-                        </span>
-                      }
-                      rules={[{ required: true, message: '请选择商品分类' }]}
-                    >
-                      <Select
-                        placeholder="请选择商品分类"
-                        style={{ borderRadius: '8px', height: '44px' }}
-                        size="large"
-                        options={categories.map((cat) => ({ label: cat, value: cat }))}
-                      />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} md={12}>
-                    <Form.Item
-                      name="condition"
-                      label={
-                        <span>
-                          <Text strong>新旧程度</Text>
-                          <Text type="danger" style={{ marginLeft: '4px' }}>*</Text>
-                        </span>
-                      }
-                      rules={[{ required: true, message: '请选择新旧程度' }]}
-                    >
-                      <Select
-                        placeholder="请选择新旧程度"
-                        style={{ borderRadius: '8px', height: '44px' }}
-                        size="large"
-                        options={conditions.map((cond) => ({ label: cond, value: cond }))}
-                      />
-                    </Form.Item>
-                  </Col>
-                </Row>
-              </div>
-            )}
+              <Form.Item
+                name="status"
+                label={<Text strong>商品状态</Text>}
+                initialValue="available"
+              >
+                <Radio.Group size="large">
+                  <Radio.Button value="available">在售</Radio.Button>
+                  <Radio.Button value="reserved">已预订</Radio.Button>
+                  <Radio.Button value="sold">已售出</Radio.Button>
+                </Radio.Group>
+              </Form.Item>
 
-            {currentStep === 3 && (
-              <div>
-                <Alert
-                  message="填写交易信息"
-                  description="准确的联系方式和位置信息能帮助买家更快联系到您"
-                  type="info"
-                  showIcon
-                  style={{ marginBottom: '24px', borderRadius: '8px' }}
-                />
-
-                <Row gutter={[20, 20]}>
-                  <Col xs={24} md={12}>
-                    <Form.Item
-                      name="location"
-                      label={
-                        <span>
-                          <Text strong>所在地区</Text>
-                          <Text type="danger" style={{ marginLeft: '4px' }}>*</Text>
-                        </span>
-                      }
-                      rules={[{ required: true, message: '请输入所在地区' }]}
-                      extra="建议填写到区县一级，如：北京市朝阳区"
-                    >
-                      <Input
-                        placeholder="如：北京市朝阳区、上海市浦东新区"
-                        style={{ borderRadius: '8px', height: '44px' }}
-                        prefix={<EnvironmentOutlined style={{ color: token.colorTextSecondary }} />}
-                      />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} md={12}>
-                    <Form.Item
-                      name="contactInfo"
-                      label={
-                        <span>
-                          <Text strong>联系方式</Text>
-                          <Text type="danger" style={{ marginLeft: '4px' }}>*</Text>
-                        </span>
-                      }
-                      rules={[{ required: true, message: '请输入联系方式' }]}
-                      extra="手机号码或微信号，方便买家联系您"
-                    >
-                      <Input
-                        placeholder="手机号码或微信号"
-                        style={{ borderRadius: '8px', height: '44px' }}
-                        prefix={<PhoneOutlined style={{ color: token.colorTextSecondary }} />}
-                      />
-                    </Form.Item>
-                  </Col>
-                </Row>
-
-                <Form.Item
-                  name="status"
-                  label={<Text strong>商品状态</Text>}
-                  initialValue="available"
-                >
-                  <Radio.Group size="large">
-                    <Radio.Button value="available">在售</Radio.Button>
-                    <Radio.Button value="reserved">已预订</Radio.Button>
-                    <Radio.Button value="sold">已售出</Radio.Button>
-                  </Radio.Group>
-                </Form.Item>
-
-                <Card
-                  style={{
-                    borderRadius: '12px',
-                    background: token.colorSuccessBg,
-                    borderColor: token.colorSuccessBorder,
-                  }}
-                  bodyStyle={{ padding: '20px' }}
-                >
-                  <Space align="start" size="middle">
-                    <CheckCircleOutlined style={{ fontSize: '24px', color: token.colorSuccess }} />
-                    <div>
-                      <Text strong style={{ display: 'block', marginBottom: '8px' }}>
-                        准备好发布了吗？
-                      </Text>
-                      <Text type="secondary" style={{ fontSize: '13px', lineHeight: 1.8 }}>
-                        请确保所有信息准确无误。发布后，您的商品将在平台上展示，
-                        感兴趣的买家会通过您提供的联系方式与您联系。
-                      </Text>
-                    </div>
-                  </Space>
-                </Card>
-              </div>
-            )}
+              <Card
+                style={{
+                  borderRadius: '12px',
+                  background: token.colorSuccessBg,
+                  borderColor: token.colorSuccessBorder,
+                }}
+                bodyStyle={{ padding: '20px' }}
+              >
+                <Space align="start" size="middle">
+                  <CheckCircleOutlined style={{ fontSize: '24px', color: token.colorSuccess }} />
+                  <div>
+                    <Text strong style={{ display: 'block', marginBottom: '8px' }}>
+                      准备好发布了吗？
+                    </Text>
+                    <Text type="secondary" style={{ fontSize: '13px', lineHeight: 1.8 }}>
+                      请确保所有信息准确无误。发布后，您的商品将在平台上展示，
+                      感兴趣的买家会通过您提供的联系方式与您联系。
+                    </Text>
+                  </div>
+                </Space>
+              </Card>
+            </div>
 
             <Divider style={{ margin: '28px 0 20px' }} />
 
