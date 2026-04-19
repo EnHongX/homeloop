@@ -149,22 +149,34 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
     
     console.log('handleFileChange called, file.status:', file.status)
     console.log('file.response:', file.response)
+    console.log('newFileList:', newFileList)
+    console.log('current fileList:', fileList)
 
     const updatedList: ImageFile[] = newFileList.map((f: any) => {
-      const ossUrl = f.response?.ossUrl || f.response?.url || f.ossUrl
-      console.log(`File ${f.name}: status=${f.status}, ossUrl=${ossUrl}`)
-      const finalUrl = ossUrl || f.url || f.thumbUrl || ''
+      const existingFile = fileList.find(ef => ef.uid === f.uid)
+      let ossUrl = f.response?.ossUrl || f.response?.url || f.ossUrl
+      
+      if (!ossUrl && existingFile?.ossUrl) {
+        ossUrl = existingFile.ossUrl
+      }
+      if (!ossUrl && f.url && !f.originFileObj) {
+        ossUrl = f.url
+      }
+      
+      console.log(`File ${f.name}: status=${f.status}, ossUrl=${ossUrl}, f.url=${f.url}, existingFile.ossUrl=${existingFile?.ossUrl}`)
+      
+      const finalUrl = ossUrl || f.url || f.thumbUrl || existingFile?.url || ''
       return {
         uid: f.uid,
         name: f.name,
         url: finalUrl,
-        thumbUrl: finalUrl || f.thumbUrl,
+        thumbUrl: finalUrl || f.thumbUrl || existingFile?.thumbUrl,
         status: f.status,
         ossUrl: ossUrl,
       }
     })
 
-    console.log('Updated fileList:', updatedList.map(f => ({ name: f.name, status: f.status, ossUrl: f.ossUrl, thumbUrl: f.thumbUrl })))
+    console.log('Updated fileList:', updatedList.map(f => ({ name: f.name, status: f.status, ossUrl: f.ossUrl, url: f.url })))
     setFileList(updatedList)
   }
 
@@ -227,7 +239,8 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
 
   const onFinish = async (values: any) => {
     console.log('onFinish called with values:', values)
-    console.log('current fileList:', fileList.map(f => ({ name: f.name, status: f.status, ossUrl: f.ossUrl })))
+    console.log('current fileList:', fileList.map(f => ({ name: f.name, status: f.status, ossUrl: f.ossUrl, url: f.url })))
+    console.log('original product.images:', product?.images)
     
     const hasUploading = fileList.some(f => f.status === 'uploading')
     if (hasUploading) {
@@ -241,18 +254,27 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       return
     }
 
-    const uploadedImages = fileList.filter(f => f.status === 'done' && (f.ossUrl || f.url))
-    console.log('uploadedImages:', uploadedImages)
+    let imageUrls: string[] = []
     
-    if (uploadedImages.length === 0) {
+    const uploadedImages = fileList.filter(f => f.status === 'done' && (f.ossUrl || f.url))
+    console.log('uploadedImages from fileList:', uploadedImages)
+    
+    if (uploadedImages.length > 0) {
+      imageUrls = uploadedImages.map(f => f.ossUrl || f.url!)
+    } else if (product && product.images && product.images.length > 0) {
+      console.log('Using original product.images:', product.images)
+      imageUrls = product.images
+    }
+    
+    console.log('Final imageUrls:', imageUrls)
+    
+    if (imageUrls.length === 0) {
       message.error('请至少保留一张商品图片')
       return
     }
 
     setSubmitting(true)
     try {
-      const imageUrls = uploadedImages.map(f => f.ossUrl || f.url!)
-
       const productData = {
         name: values.name,
         description: values.description,
