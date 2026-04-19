@@ -37,6 +37,7 @@ app.listen(PORT, () => {
   console.log(`   - GET    /api/products`)
   console.log(`   - GET    /api/products/:id`)
   console.log(`   - POST   /api/products`)
+  console.log(`   - PUT    /api/products/:id`)
   console.log(`   - DELETE /api/products/:id`)
   console.log(`   - POST   /api/upload`)
 })
