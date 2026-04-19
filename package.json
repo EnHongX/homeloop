@@ -3,10 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "npm run dev:all",
+    "dev:frontend": "next dev --port 9000",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:all": "concurrently -n \"FRONTEND,BACKEND\" -c \"blue,green\" \"npm run dev:frontend\" \"npm run dev:backend\"",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "start": "next start --port 9000",
+    "lint": "next lint",
+    "install:all": "npm install && cd backend && npm install && npm run prisma:generate",
+    "prisma:generate": "prisma generate && cd backend && npm run prisma:generate",
+    "prisma:migrate": "prisma migrate dev"
   },
   "dependencies": {
     "@prisma/client": "^5.0.0",
@@ -21,6 +27,7 @@
     "@types/node": "^20.0.0",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
+    "concurrently": "^8.2.2",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.4",
     "prisma": "^5.0.0",

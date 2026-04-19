@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { PlusOutlined, ShoppingOutlined, SearchOutlined, FilterOutlined, EnvironmentOutlined, TagOutlined, LoadingOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import AppLayout from '@/components/AppLayout'
+import { API_ENDPOINTS } from '@/lib/api'
 
 const { Title, Text } = Typography
 const { Search } = Input
@@ -60,7 +61,7 @@ export default function ProductsPage() {
   const fetchProducts = async () => {
     setLoading(true)
     try {
-      const response = await fetch('/api/products')
+      const response = await fetch(API_ENDPOINTS.PRODUCTS)
       const result = await response.json()
       if (result.success) {
         setProducts(result.data)
