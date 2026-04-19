@@ -117,4 +117,76 @@ router.post('/', async (req: Request, res: Response) => {
   }
 })
 
+router.get('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        category: true,
+      },
+    })
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        error: '商品不存在',
+      })
+    }
+
+    await prisma.product.update({
+      where: { id },
+      data: {
+        views: {
+          increment: 1,
+        },
+      },
+    })
+
+    return res.json({
+      success: true,
+      data: product,
+    })
+  } catch (error) {
+    console.error('Error fetching product:', error)
+    return res.status(500).json({
+      success: false,
+      error: '获取商品详情失败',
+    })
+  }
+})
+
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    
+    const product = await prisma.product.findUnique({
+      where: { id },
+    })
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        error: '商品不存在',
+      })
+    }
+
+    await prisma.product.delete({
+      where: { id },
+    })
+
+    return res.json({
+      success: true,
+      message: '商品已删除',
+    })
+  } catch (error) {
+    console.error('Error deleting product:', error)
+    return res.status(500).json({
+      success: false,
+      error: '删除商品失败',
+    })
+  }
+})
+
 export default router
