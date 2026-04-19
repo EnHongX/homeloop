@@ -190,6 +190,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       url: f.url,
       thumbUrl: f.thumbUrl,
       status: f.status,
+      ossUrl: f.ossUrl,
     })),
     onPreview: handlePreview,
     onChange: handleFileChange,
@@ -240,7 +241,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       return
     }
 
-    const uploadedImages = fileList.filter(f => f.status === 'done' && f.ossUrl)
+    const uploadedImages = fileList.filter(f => f.status === 'done' && (f.ossUrl || f.url))
     console.log('uploadedImages:', uploadedImages)
     
     if (uploadedImages.length === 0) {
@@ -250,7 +251,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
 
     setSubmitting(true)
     try {
-      const imageUrls = uploadedImages.map(f => f.ossUrl!)
+      const imageUrls = uploadedImages.map(f => f.ossUrl || f.url!)
 
       const productData = {
         name: values.name,
