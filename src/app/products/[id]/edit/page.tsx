@@ -4,6 +4,7 @@ import { Layout, Typography, Button, Card, Row, Col, Form, Input, InputNumber, S
 import Link from 'next/link'
 import { HomeOutlined, EditOutlined, UploadOutlined, ArrowLeftOutlined } from '@ant-design/icons'
 import { useRouter } from 'next/navigation'
+import { API_ENDPOINTS } from '@/lib/api'
 
 const { Header, Content, Footer } = Layout
 const { Title, Text } = Typography
@@ -15,7 +16,7 @@ const conditions = ['全新', '九成新', '八成新', '七成新及以下']
 
 const uploadProps = {
   name: 'file',
-  action: '/api/upload',
+  action: API_ENDPOINTS.UPLOAD,
   listType: 'picture',
   previewFile: async (file: File | Blob) => {
     return await new Promise<string>((resolve) => {

@@ -6,6 +6,7 @@ import { HomeOutlined, PlusOutlined, ArrowLeftOutlined, FileTextOutlined, Pictur
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import AppLayout from '@/components/AppLayout'
+import { API_ENDPOINTS } from '@/lib/api'
 
 const getBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -72,9 +73,9 @@ export default function NewProductPage() {
       formData.append('file', file)
       formData.append('folder', 'products')
 
-      console.log('Uploading to /api/upload...')
+      console.log('Uploading to', API_ENDPOINTS.UPLOAD)
       
-      const response = await fetch('/api/upload', {
+      const response = await fetch(API_ENDPOINTS.UPLOAD, {
         method: 'POST',
         body: formData,
       })
@@ -220,7 +221,7 @@ export default function NewProductPage() {
 
       console.log('Sending product data:', productData)
 
-      const response = await fetch('/api/products', {
+      const response = await fetch(API_ENDPOINTS.PRODUCTS, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
