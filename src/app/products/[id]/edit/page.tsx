@@ -94,6 +94,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
           location: data.location || '',
           contactInfo: data.contactInfo || '',
           status: data.status,
+          images: initialFileList,
         })
       } else {
         if (response.status === 404) {
@@ -178,6 +179,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
 
     console.log('Updated fileList:', updatedList.map(f => ({ name: f.name, status: f.status, ossUrl: f.ossUrl, url: f.url })))
     setFileList(updatedList)
+    form.setFieldsValue({ images: updatedList })
   }
 
   const handlePreview = async (file: any) => {
