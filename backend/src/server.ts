@@ -39,6 +39,7 @@ app.listen(PORT, () => {
   console.log(`   - POST   /api/auth/send-code`)
   console.log(`   - POST   /api/auth/login`)
   console.log(`   - GET    /api/auth/me`)
+  console.log(`   - POST   /api/auth/logout`)
   console.log(`   - GET    /api/products`)
   console.log(`   - GET    /api/products/:id`)
   console.log(`   - POST   /api/products`)

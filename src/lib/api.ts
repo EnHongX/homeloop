@@ -7,6 +7,7 @@ export const API_ENDPOINTS = {
   AUTH_SEND_CODE: `${API_BASE_URL}/api/auth/send-code`,
   AUTH_LOGIN: `${API_BASE_URL}/api/auth/login`,
   AUTH_ME: `${API_BASE_URL}/api/auth/me`,
+  AUTH_LOGOUT: `${API_BASE_URL}/api/auth/logout`,
 }
 
 export default API_BASE_URL

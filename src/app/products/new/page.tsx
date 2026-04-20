@@ -4,9 +4,11 @@ import { Typography, Button, Card, Row, Col, Form, Input, InputNumber, Select, U
 import Link from 'next/link'
 import { HomeOutlined, PlusOutlined, ArrowLeftOutlined, FileTextOutlined, PictureOutlined, TagOutlined, EnvironmentOutlined, PhoneOutlined, CheckCircleOutlined, LoadingOutlined } from '@ant-design/icons'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import AppLayout from '@/components/AppLayout'
 import { API_ENDPOINTS } from '@/lib/api'
+import { getToken } from '@/lib/auth'
+import { useAuth } from '@/contexts/AuthContext'
 
 const getBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -34,11 +36,19 @@ interface ImageFile {
 
 export default function NewProductPage() {
   const router = useRouter()
+  const { isLoggedIn, isLoading } = useAuth()
   const [form] = Form.useForm()
   const { token } = theme.useToken()
   const [currentStep, setCurrentStep] = useState(0)
   const [fileList, setFileList] = useState<ImageFile[]>([])
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!isLoading && !isLoggedIn) {
+      message.info('请先登录后再发布商品')
+      router.push('/login')
+    }
+  }, [isLoggedIn, isLoading, router])
 
   const steps = [
     {
@@ -221,10 +231,13 @@ export default function NewProductPage() {
 
       console.log('Sending product data:', productData)
 
+      const token = getToken()
+      
       const response = await fetch(API_ENDPOINTS.PRODUCTS, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
         },
         body: JSON.stringify(productData),
       })
@@ -236,7 +249,12 @@ export default function NewProductPage() {
         message.success('商品发布成功！')
         router.push('/products')
       } else {
-        message.error(result.error || '发布失败，请重试')
+        if (response.status === 401) {
+          message.error('登录已过期，请重新登录')
+          router.push('/login')
+        } else {
+          message.error(result.error || '发布失败，请重试')
+        }
       }
     } catch (error) {
       console.error('Error submitting form:', error)

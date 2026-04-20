@@ -43,6 +43,16 @@ export default function AppLayout({
     router.push('/')
   }
 
+  const handlePublishClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    if (!isLoggedIn) {
+      message.info('请先登录后再发布商品')
+      router.push('/login')
+    } else {
+      router.push('/products/new')
+    }
+  }
+
   const userMenuItems = [
     {
       key: 'profile',
@@ -83,12 +93,17 @@ export default function AppLayout({
       },
       {
         key: '/products/new',
-        label: (
-          <Link href="/products/new" style={{ display: 'block' }}>
-            发布商品
-          </Link>
-        ),
+        label: '发布商品',
         icon: <PlusOutlined />,
+        onClick: () => {
+          setMobileMenuOpen(false)
+          if (!isLoggedIn) {
+            message.info('请先登录后再发布商品')
+            router.push('/login')
+          } else {
+            router.push('/products/new')
+          }
+        },
       },
     ]
 
@@ -249,20 +264,19 @@ export default function AppLayout({
                   <ShoppingOutlined />
                   浏览商品
                 </Link>
-                <Link href="/products/new">
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    size="middle"
-                    style={{
-                      fontWeight: 500,
-                      height: '36px',
-                      borderRadius: '6px',
-                    }}
-                  >
-                    发布商品
-                  </Button>
-                </Link>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  size="middle"
+                  onClick={handlePublishClick}
+                  style={{
+                    fontWeight: 500,
+                    height: '36px',
+                    borderRadius: '6px',
+                  }}
+                >
+                  发布商品
+                </Button>
 
                 {!isLoading && (
                   <>

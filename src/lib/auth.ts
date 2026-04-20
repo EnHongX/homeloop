@@ -143,10 +143,41 @@ export function getUser(): User | null {
   }
 }
 
-export function logout(): void {
-  if (typeof window === 'undefined') return
-  localStorage.removeItem(TOKEN_KEY)
-  localStorage.removeItem(USER_KEY)
+export async function logout(): Promise<{
+  success: boolean
+  message: string
+  error?: string
+}> {
+  const token = getToken()
+  
+  if (token) {
+    try {
+      const response = await fetch(API_ENDPOINTS.AUTH_LOGOUT, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      
+      const data = await response.json()
+      
+      if (!data.success) {
+        console.warn('[Auth] 后端登出失败:', data.error)
+      }
+    } catch (error) {
+      console.warn('[Auth] 调用后端登出接口失败:', error)
+    }
+  }
+  
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(USER_KEY)
+  }
+  
+  return {
+    success: true,
+    message: '已退出登录',
+  }
 }
 
 export function isLoggedIn(): boolean {
