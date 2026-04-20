@@ -57,7 +57,7 @@ export default function AppLayout({
     {
       key: 'profile',
       icon: <UserOutlined />,
-      label: user?.nickname || user?.phone,
+      label: user?.phone,
       disabled: true,
     },
     {
@@ -121,11 +121,7 @@ export default function AppLayout({
                   style={{ background: token.colorPrimary }}
                 />
                 <div>
-                  <Text strong>{user?.nickname || '用户'}</Text>
-                  <br />
-                  <Text type="secondary" style={{ fontSize: '12px' }}>
-                    {user?.phone}
-                  </Text>
+                  <Text strong>{user?.phone}</Text>
                 </div>
               </Space>
             </div>
@@ -301,7 +297,7 @@ export default function AppLayout({
                             style={{ background: token.colorPrimary }}
                           />
                           <Text style={{ fontSize: '13px' }}>
-                            {user?.nickname || user?.phone?.slice(-4)}
+                            {user?.phone}
                           </Text>
                         </Button>
                       </Dropdown>
