@@ -1,10 +1,11 @@
 'use client'
 
-import { Layout, Typography, Button, Space, Menu, Drawer, theme, ConfigProvider } from 'antd'
+import { Layout, Typography, Button, Space, Menu, Drawer, theme, Dropdown, Avatar, message } from 'antd'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { HomeOutlined, PlusOutlined, ShoppingOutlined, MenuOutlined } from '@ant-design/icons'
+import { usePathname, useRouter } from 'next/navigation'
+import { HomeOutlined, PlusOutlined, ShoppingOutlined, MenuOutlined, UserOutlined, LogoutOutlined, LoginOutlined } from '@ant-design/icons'
 import { useState } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
 
 const { Header, Content, Footer } = Layout
 const { Title, Text } = Typography
@@ -21,17 +22,128 @@ export default function AppLayout({
   showFooter = true,
 }: AppLayoutProps) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { user, isLoggedIn, handleLogout, isLoading } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { token } = theme.useToken()
 
   const getSelectedKey = () => {
     if (pathname === '/') return '/'
+    if (pathname.startsWith('/login')) return '/login'
     if (pathname.startsWith('/products/new')) return '/products/new'
     if (pathname.startsWith('/products')) return '/products'
     return '/'
   }
 
   const selectedKey = getSelectedKey()
+
+  const handleLogoutClick = () => {
+    handleLogout()
+    message.success('已退出登录')
+    router.push('/')
+  }
+
+  const userMenuItems = [
+    {
+      key: 'profile',
+      icon: <UserOutlined />,
+      label: user?.nickname || user?.phone,
+      disabled: true,
+    },
+    {
+      type: 'divider' as const,
+    },
+    {
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      label: '退出登录',
+      onClick: handleLogoutClick,
+    },
+  ]
+
+  const getMobileMenuItems = () => {
+    const items = [
+      {
+        key: '/',
+        label: (
+          <Link href="/" style={{ display: 'block' }}>
+            首页
+          </Link>
+        ),
+        icon: <HomeOutlined />,
+      },
+      {
+        key: '/products',
+        label: (
+          <Link href="/products" style={{ display: 'block' }}>
+            浏览商品
+          </Link>
+        ),
+        icon: <ShoppingOutlined />,
+      },
+      {
+        key: '/products/new',
+        label: (
+          <Link href="/products/new" style={{ display: 'block' }}>
+            发布商品
+          </Link>
+        ),
+        icon: <PlusOutlined />,
+      },
+    ]
+
+    if (isLoggedIn) {
+      items.push(
+        { type: 'divider' as const },
+        {
+          key: 'user',
+          label: (
+            <div style={{ padding: '8px 0' }}>
+              <Space>
+                <Avatar
+                  size={32}
+                  icon={<UserOutlined />}
+                  style={{ background: token.colorPrimary }}
+                />
+                <div>
+                  <Text strong>{user?.nickname || '用户'}</Text>
+                  <br />
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    {user?.phone}
+                  </Text>
+                </div>
+              </Space>
+            </div>
+          ),
+          disabled: true,
+        },
+        {
+          key: 'logout',
+          label: '退出登录',
+          icon: <LogoutOutlined />,
+          onClick: () => {
+            setMobileMenuOpen(false)
+            handleLogoutClick()
+          },
+        }
+      )
+    } else {
+      items.push(
+        { type: 'divider' as const },
+        {
+          key: '/login',
+          label: (
+            <Link href="/login" style={{ display: 'block' }}>
+              登录 / 注册
+            </Link>
+          ),
+          icon: <LoginOutlined />,
+        }
+      )
+    }
+
+    return items
+  }
 
   return (
     <Layout
@@ -151,6 +263,50 @@ export default function AppLayout({
                     发布商品
                   </Button>
                 </Link>
+
+                {!isLoading && (
+                  <>
+                    {isLoggedIn ? (
+                      <Dropdown
+                        menu={{ items: userMenuItems }}
+                        placement="bottomRight"
+                      >
+                        <Button
+                          type="text"
+                          style={{
+                            height: '36px',
+                            padding: '0 8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                          }}
+                        >
+                          <Avatar
+                            size={28}
+                            icon={<UserOutlined />}
+                            style={{ background: token.colorPrimary }}
+                          />
+                          <Text style={{ fontSize: '13px' }}>
+                            {user?.nickname || user?.phone?.slice(-4)}
+                          </Text>
+                        </Button>
+                      </Dropdown>
+                    ) : (
+                      <Link href="/login">
+                        <Button
+                          type="text"
+                          icon={<UserOutlined />}
+                          style={{
+                            height: '36px',
+                            color: token.colorText,
+                          }}
+                        >
+                          登录
+                        </Button>
+                      </Link>
+                    )}
+                  </>
+                )}
               </Space>
             </div>
 
@@ -233,35 +389,7 @@ export default function AppLayout({
           mode="inline"
           selectedKeys={[selectedKey]}
           style={{ border: 'none' }}
-          items={[
-            {
-              key: '/',
-              label: (
-                <Link href="/" style={{ display: 'block' }}>
-                  首页
-                </Link>
-              ),
-              icon: <HomeOutlined />,
-            },
-            {
-              key: '/products',
-              label: (
-                <Link href="/products" style={{ display: 'block' }}>
-                  浏览商品
-                </Link>
-              ),
-              icon: <ShoppingOutlined />,
-            },
-            {
-              key: '/products/new',
-              label: (
-                <Link href="/products/new" style={{ display: 'block' }}>
-                  发布商品
-                </Link>
-              ),
-              icon: <PlusOutlined />,
-            },
-          ]}
+          items={getMobileMenuItems()}
         />
       </Drawer>
 
