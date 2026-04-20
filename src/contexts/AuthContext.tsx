@@ -9,7 +9,7 @@ interface AuthContextType {
   isLoggedIn: boolean
   setUser: (user: User | null) => void
   checkAuth: () => Promise<void>
-  handleLogout: () => void
+  handleLogout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -52,8 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth()
   }, [])
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     setUser(null)
   }
 

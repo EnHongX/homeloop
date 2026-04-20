@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express'
 import prisma from '../lib/prisma'
 import redis from '../lib/redis'
 import jwt from 'jsonwebtoken'
+import { blacklistToken, getTokenFromHeader, isTokenBlacklisted } from '../middleware/auth'
 
 const router = Router()
 
@@ -210,6 +211,15 @@ router.get('/me', async (req: Request, res: Response) => {
     }
 
     const token = authHeader.slice(7)
+
+    const isBlacklisted = await isTokenBlacklisted(token)
+    if (isBlacklisted) {
+      return res.status(401).json({
+        success: false,
+        error: '登录已过期，请重新登录',
+      })
+    }
+
     const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; phone: string }
 
     const user = await prisma.user.findUnique({
@@ -244,6 +254,34 @@ router.get('/me', async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       error: '获取用户信息失败',
+    })
+  }
+})
+
+router.post('/logout', async (req: Request, res: Response) => {
+  try {
+    const token = getTokenFromHeader(req)
+    
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: '未登录',
+      })
+    }
+
+    await blacklistToken(token)
+
+    console.log(`[Logout] 用户已登出`)
+
+    return res.json({
+      success: true,
+      message: '已成功退出登录',
+    })
+  } catch (error) {
+    console.error('Error logging out:', error)
+    return res.status(500).json({
+      success: false,
+      error: '登出失败',
     })
   }
 })

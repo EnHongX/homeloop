@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express'
 import prisma from '../lib/prisma'
+import authMiddleware, { AuthRequest } from '../middleware/auth'
 
 const router = Router()
 
@@ -27,7 +28,7 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 })
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const body = req.body
     
@@ -44,7 +45,7 @@ router.post('/', async (req: Request, res: Response) => {
       images,
     } = body
 
-    console.log('Received product data:', {
+    console.log('Received product data from user:', req.userId, {
       name,
       description,
       price,
@@ -97,6 +98,7 @@ router.post('/', async (req: Request, res: Response) => {
         location,
         contactInfo,
         status: status || 'available',
+        userId: req.userId,
       },
       include: {
         category: true,
@@ -157,7 +159,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 })
 
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params
     const body = req.body
@@ -171,6 +173,13 @@ router.put('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({
         success: false,
         error: '商品不存在',
+      })
+    }
+
+    if (existingProduct.userId && existingProduct.userId !== req.userId) {
+      return res.status(403).json({
+        success: false,
+        error: '您没有权限修改此商品',
       })
     }
 
@@ -250,7 +259,7 @@ router.put('/:id', async (req: Request, res: Response) => {
   }
 })
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params
     
@@ -262,6 +271,13 @@ router.delete('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({
         success: false,
         error: '商品不存在',
+      })
+    }
+
+    if (product.userId && product.userId !== req.userId) {
+      return res.status(403).json({
+        success: false,
+        error: '您没有权限删除此商品',
       })
     }
 
@@ -277,7 +293,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     console.error('Error deleting product:', error)
     return res.status(500).json({
       success: false,
-      error: '删除商品失败',
+      error: error instanceof Error ? error.message : '删除商品失败',
     })
   }
 })
