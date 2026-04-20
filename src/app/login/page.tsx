@@ -182,21 +182,23 @@ export default function LoginPage() {
               />
             </Form.Item>
 
-            <Form.Item
-              name="code"
-              label="验证码"
-              rules={[
-                { required: true, message: '请输入验证码' },
-                { len: 6, message: '请输入6位验证码' },
-              ]}
-            >
+            <Form.Item label="验证码">
               <Input.Group compact>
-                <Input
-                  style={{ width: 'calc(100% - 120px)' }}
-                  prefix={<LockOutlined style={{ color: token.colorTextSecondary }} />}
-                  placeholder="请输入验证码"
-                  maxLength={6}
-                />
+                <Form.Item
+                  name="code"
+                  noStyle
+                  rules={[
+                    { required: true, message: '请输入验证码' },
+                    { len: 6, message: '请输入6位验证码' },
+                  ]}
+                >
+                  <Input
+                    style={{ width: 'calc(100% - 120px)' }}
+                    prefix={<LockOutlined style={{ color: token.colorTextSecondary }} />}
+                    placeholder="请输入验证码"
+                    maxLength={6}
+                  />
+                </Form.Item>
                 <Button
                   type="primary"
                   style={{ width: '120px' }}
