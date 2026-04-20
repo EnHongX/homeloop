@@ -32,51 +32,62 @@ router.post('/send-code', async (req: Request, res: Response) => {
       })
     }
 
-    const sendCountKey = getSendCountKey(phone)
-    const currentCount = await redis.get(sendCountKey)
-    const count = currentCount ? parseInt(currentCount, 10) : 0
+    console.log(`[SMS] 收到发送验证码请求: ${phone}`)
 
-    if (count >= SMS_CODE_SEND_LIMIT_PER_PHONE) {
-      const ttl = await redis.ttl(sendCountKey)
-      return res.status(429).json({
+    try {
+      const sendCountKey = getSendCountKey(phone)
+      const currentCount = await redis.get(sendCountKey)
+      const count = currentCount ? parseInt(currentCount, 10) : 0
+
+      if (count >= SMS_CODE_SEND_LIMIT_PER_PHONE) {
+        const ttl = await redis.ttl(sendCountKey)
+        return res.status(429).json({
+          success: false,
+          error: `发送次数已达上限，请在 ${Math.ceil(ttl / 60)} 分钟后再试`,
+        })
+      }
+
+      const codeKey = getCodeKey(phone)
+      const existingCode = await redis.get(codeKey)
+      if (existingCode) {
+        const ttl = await redis.ttl(codeKey)
+        if (ttl > SMS_CODE_EXPIRE_SECONDS - 60) {
+          return res.status(429).json({
+            success: false,
+            error: `验证码发送过于频繁，请在 ${Math.ceil(ttl - (SMS_CODE_EXPIRE_SECONDS - 60))} 秒后再试`,
+          })
+        }
+      }
+
+      await redis.setex(codeKey, SMS_CODE_EXPIRE_SECONDS, SMS_VERIFICATION_CODE)
+
+      const newCount = count + 1
+      if (count === 0) {
+        await redis.setex(sendCountKey, SMS_CODE_SEND_LIMIT_WINDOW_SECONDS, newCount.toString())
+      } else {
+        await redis.set(sendCountKey, newCount.toString(), 'KEEPTTL')
+      }
+
+      console.log(`[SMS] 验证码已存储到 Redis: phone=${phone}, code=${SMS_VERIFICATION_CODE}`)
+    } catch (redisError) {
+      console.error('[Redis] Redis 操作失败:', redisError)
+      return res.status(500).json({
         success: false,
-        error: `发送次数已达上限，请在 ${Math.ceil(ttl / 60)} 分钟后再试`,
+        error: '服务连接失败，请确保 Redis 服务已启动。测试环境下验证码为: ' + SMS_VERIFICATION_CODE,
       })
     }
 
-    const codeKey = getCodeKey(phone)
-    const existingCode = await redis.get(codeKey)
-    if (existingCode) {
-      const ttl = await redis.ttl(codeKey)
-      if (ttl > SMS_CODE_EXPIRE_SECONDS - 60) {
-        return res.status(429).json({
-          success: false,
-          error: `验证码发送过于频繁，请在 ${Math.ceil(ttl - (SMS_CODE_EXPIRE_SECONDS - 60))} 秒后再试`,
-        })
-      }
-    }
-
-    await redis.setex(codeKey, SMS_CODE_EXPIRE_SECONDS, SMS_VERIFICATION_CODE)
-
-    const newCount = count + 1
-    if (count === 0) {
-      await redis.setex(sendCountKey, SMS_CODE_SEND_LIMIT_WINDOW_SECONDS, newCount.toString())
-    } else {
-      await redis.set(sendCountKey, newCount.toString(), 'KEEPTTL')
-    }
-
-    console.log(`[SMS] 验证码已发送到 ${phone}: ${SMS_VERIFICATION_CODE}`)
-
     return res.json({
       success: true,
-      message: `验证码已发送，当前测试验证码为: ${SMS_VERIFICATION_CODE}`,
+      message: `验证码已发送，测试验证码为: ${SMS_VERIFICATION_CODE}（有效期 ${SMS_CODE_EXPIRE_SECONDS} 秒）`,
       expireSeconds: SMS_CODE_EXPIRE_SECONDS,
+      testCode: SMS_VERIFICATION_CODE,
     })
   } catch (error) {
     console.error('Error sending verification code:', error)
     return res.status(500).json({
       success: false,
-      error: '发送验证码失败',
+      error: error instanceof Error ? error.message : '发送验证码失败',
     })
   }
 })
@@ -84,6 +95,8 @@ router.post('/send-code', async (req: Request, res: Response) => {
 router.post('/login', async (req: Request, res: Response) => {
   try {
     const { phone, code } = req.body
+
+    console.log(`[Login] 收到登录请求: phone=${phone}`)
 
     if (!phone || !validatePhone(phone)) {
       return res.status(400).json({
@@ -99,24 +112,39 @@ router.post('/login', async (req: Request, res: Response) => {
       })
     }
 
-    const codeKey = getCodeKey(phone)
-    const storedCode = await redis.get(codeKey)
+    let storedCode: string | null = null
+    try {
+      const codeKey = getCodeKey(phone)
+      storedCode = await redis.get(codeKey)
+      console.log(`[Login] Redis 中验证码: phone=${phone}, storedCode=${storedCode}, inputCode=${code}`)
+    } catch (redisError) {
+      console.error('[Redis] 登录时读取验证码失败:', redisError)
+      return res.status(500).json({
+        success: false,
+        error: `服务连接失败，请确保 Redis 服务已启动。测试验证码为: ${SMS_VERIFICATION_CODE}`,
+      })
+    }
 
     if (!storedCode) {
       return res.status(400).json({
         success: false,
-        error: '验证码已过期或不存在',
+        error: `验证码已过期或不存在。请先点击"获取验证码"。测试验证码为: ${SMS_VERIFICATION_CODE}`,
       })
     }
 
     if (storedCode !== code) {
       return res.status(400).json({
         success: false,
-        error: '验证码错误',
+        error: `验证码错误。当前测试验证码为: ${SMS_VERIFICATION_CODE}`,
       })
     }
 
-    await redis.del(codeKey)
+    try {
+      const codeKey = getCodeKey(phone)
+      await redis.del(codeKey)
+    } catch (e) {
+      console.warn('[Redis] 删除验证码失败:', e)
+    }
 
     let user = await prisma.user.findUnique({
       where: { phone },
@@ -124,6 +152,7 @@ router.post('/login', async (req: Request, res: Response) => {
 
     let isNewUser = false
     if (!user) {
+      console.log(`[Login] 用户不存在，自动创建: phone=${phone}`)
       user = await prisma.user.create({
         data: {
           phone,
@@ -143,6 +172,8 @@ router.post('/login', async (req: Request, res: Response) => {
         expiresIn: `${JWT_EXPIRE_DAYS}d`,
       }
     )
+
+    console.log(`[Login] 登录成功: phone=${phone}, isNewUser=${isNewUser}`)
 
     return res.json({
       success: true,
