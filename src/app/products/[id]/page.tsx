@@ -7,6 +7,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AppLayout from '@/components/AppLayout'
 import { API_ENDPOINTS } from '@/lib/api'
+import { useAuth } from '@/contexts/AuthContext'
+import { getToken } from '@/lib/auth'
 
 const { Title, Text } = Typography
 
@@ -75,12 +77,15 @@ const getStatusText = (status: string) => {
 export default function ProductDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const { token } = theme.useToken()
+  const { user, isLoading: authLoading } = useAuth()
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [deleteModalVisible, setDeleteModalVisible] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
+
+  const isOwner = user && product && user.id === product.userId
 
   useEffect(() => {
     fetchProduct()
@@ -111,8 +116,12 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const handleDelete = async () => {
     setDeleting(true)
     try {
+      const token = getToken()
       const response = await fetch(`${API_ENDPOINTS.PRODUCTS}/${params.id}`, {
         method: 'DELETE',
+        headers: {
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
       })
       const result = await response.json()
       if (result.success) {
@@ -120,7 +129,14 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         setDeleteModalVisible(false)
         router.push('/products')
       } else {
-        message.error(result.error || '删除失败')
+        if (response.status === 401) {
+          message.error('登录已过期，请重新登录')
+          router.push('/login')
+        } else if (response.status === 403) {
+          message.error(result.error || '您没有权限删除此商品')
+        } else {
+          message.error(result.error || '删除失败')
+        }
       }
     } catch (error) {
       console.error('Error deleting product:', error)
@@ -493,26 +509,28 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                     </Button>
                   )}
                   
-                  <Row gutter={[8, 8]}>
-                    <Col flex={1}>
-                      <Link href={`/products/${params.id}/edit`} style={{ display: 'block' }}>
-                        <Button icon={<EditOutlined />} block style={{ height: '40px', borderRadius: '6px' }}>
-                          编辑商品
+                  {isOwner && (
+                    <Row gutter={[8, 8]}>
+                      <Col flex={1}>
+                        <Link href={`/products/${params.id}/edit`} style={{ display: 'block' }}>
+                          <Button icon={<EditOutlined />} block style={{ height: '40px', borderRadius: '6px' }}>
+                            编辑商品
+                          </Button>
+                        </Link>
+                      </Col>
+                      <Col flex={1}>
+                        <Button
+                          icon={<DeleteOutlined />}
+                          danger
+                          block
+                          style={{ height: '40px', borderRadius: '6px' }}
+                          onClick={() => setDeleteModalVisible(true)}
+                        >
+                          删除商品
                         </Button>
-                      </Link>
-                    </Col>
-                    <Col flex={1}>
-                      <Button
-                        icon={<DeleteOutlined />}
-                        danger
-                        block
-                        style={{ height: '40px', borderRadius: '6px' }}
-                        onClick={() => setDeleteModalVisible(true)}
-                      >
-                        删除商品
-                      </Button>
-                    </Col>
-                  </Row>
+                      </Col>
+                    </Row>
+                  )}
                 </Space>
               </Card>
             </div>

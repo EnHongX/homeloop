@@ -176,7 +176,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       })
     }
 
-    if (existingProduct.userId && existingProduct.userId !== req.userId) {
+    if (!existingProduct.userId || existingProduct.userId !== req.userId) {
       return res.status(403).json({
         success: false,
         error: '您没有权限修改此商品',
@@ -274,7 +274,7 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
       })
     }
 
-    if (product.userId && product.userId !== req.userId) {
+    if (!product.userId || product.userId !== req.userId) {
       return res.status(403).json({
         success: false,
         error: '您没有权限删除此商品',
