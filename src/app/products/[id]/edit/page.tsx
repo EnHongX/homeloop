@@ -2,11 +2,13 @@
 
 import { Typography, Button, Card, Row, Col, Form, Input, InputNumber, Select, Upload, Radio, Space, Breadcrumb, message, Divider, theme, Alert, Spin, Result } from 'antd'
 import Link from 'next/link'
-import { HomeOutlined, EditOutlined, UploadOutlined, ArrowLeftOutlined, LoadingOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
+import { HomeOutlined, EditOutlined, UploadOutlined, ArrowLeftOutlined, LoadingOutlined, ExclamationCircleOutlined, LockOutlined } from '@ant-design/icons'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import AppLayout from '@/components/AppLayout'
 import { API_ENDPOINTS } from '@/lib/api'
+import { useAuth } from '@/contexts/AuthContext'
+import { getToken } from '@/lib/auth'
 
 const getBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -44,6 +46,7 @@ interface Product {
   location: string | null
   contactInfo: string | null
   status: string
+  userId: string | null
   category: {
     id: string
     name: string
@@ -54,25 +57,42 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
   const router = useRouter()
   const [form] = Form.useForm()
   const { token } = theme.useToken()
+  const { user, isLoading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [notFound, setNotFound] = useState(false)
+  const [noPermission, setNoPermission] = useState(false)
   const [product, setProduct] = useState<Product | null>(null)
   const [fileList, setFileList] = useState<ImageFile[]>([])
 
   useEffect(() => {
+    if (authLoading) return
     fetchProduct()
-  }, [params.id])
+  }, [params.id, authLoading])
 
   const fetchProduct = async () => {
     setLoading(true)
     setNotFound(false)
+    setNoPermission(false)
+    
+    if (!user) {
+      setNoPermission(true)
+      setLoading(false)
+      return
+    }
+    
     try {
       const response = await fetch(`${API_ENDPOINTS.PRODUCTS}/${params.id}`)
       const result = await response.json()
       if (result.success) {
         const data = result.data
         setProduct(data)
+        
+        if (data.userId && user.id !== data.userId) {
+          setNoPermission(true)
+          setLoading(false)
+          return
+        }
         
         const initialFileList: ImageFile[] = data.images.map((img: string, index: number) => ({
           uid: `-${index}`,
@@ -292,10 +312,12 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
 
       console.log('Sending product data:', productData)
 
+      const token = getToken()
       const response = await fetch(`${API_ENDPOINTS.PRODUCTS}/${params.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
         },
         body: JSON.stringify(productData),
       })
@@ -307,7 +329,14 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
         message.success('商品更新成功！')
         router.push(`/products/${params.id}`)
       } else {
-        message.error(result.error || '更新失败，请重试')
+        if (response.status === 401) {
+          message.error('登录已过期，请重新登录')
+          router.push('/login')
+        } else if (response.status === 403) {
+          message.error(result.error || '您没有权限修改此商品')
+        } else {
+          message.error(result.error || '更新失败，请重试')
+        }
       }
     } catch (error) {
       console.error('Error submitting form:', error)
@@ -340,6 +369,38 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
           <div style={{ marginTop: 16 }}>
             <Text type="secondary">加载中...</Text>
           </div>
+        </div>
+      </AppLayout>
+    )
+  }
+
+  if (noPermission) {
+    return (
+      <AppLayout>
+        <div
+          style={{
+            maxWidth: '800px',
+            margin: '0 auto',
+            padding: '80px 16px',
+            textAlign: 'center',
+          }}
+        >
+          <Result
+            status="403"
+            title="无权限访问"
+            subTitle="您没有权限编辑此商品，只有商品发布者才能编辑"
+            icon={<LockOutlined />}
+            extra={
+              <Space>
+                <Link href={`/products/${params.id}`}>
+                  <Button type="primary">返回商品详情</Button>
+                </Link>
+                <Link href="/products">
+                  <Button>返回商品列表</Button>
+                </Link>
+              </Space>
+            }
+          />
         </div>
       </AppLayout>
     )
