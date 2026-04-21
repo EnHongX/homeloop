@@ -1,11 +1,14 @@
 'use client'
 
-import { Typography, Button, Card, Row, Col, Space, Tag, Input, Select, Pagination, theme, Result, Statistic, Divider, Spin, Empty } from 'antd'
+import { Typography, Button, Card, Row, Col, Space, Tag, Input, Select, Pagination, theme, Result, Statistic, Divider, Spin, Empty, Checkbox, Dropdown, MenuProps } from 'antd'
 import Link from 'next/link'
-import { PlusOutlined, ShoppingOutlined, SearchOutlined, FilterOutlined, EnvironmentOutlined, TagOutlined, LoadingOutlined } from '@ant-design/icons'
+import { ShoppingOutlined, SearchOutlined, FilterOutlined, EnvironmentOutlined, TagOutlined, LoadingOutlined, UserOutlined, MoreOutlined, EditOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import AppLayout from '@/components/AppLayout'
 import { API_ENDPOINTS } from '@/lib/api'
+import { useAuth } from '@/contexts/AuthContext'
+import { getToken } from '@/lib/auth'
+import { useRouter } from 'next/navigation'
 
 const { Title, Text } = Typography
 const { Search } = Input
@@ -38,30 +41,55 @@ interface Product {
   userId: string | null
   views: number
   isFeatured: boolean
+  quantity: number
+  deliveryMethod: string | null
   category: {
     id: string
     name: string
+  } | null
+  user: {
+    id: string
+    phone: string
+    nickname: string | null
+    avatar: string | null
   } | null
 }
 
 export default function ProductsPage() {
   const { token } = theme.useToken()
+  const { user, isLoggedIn, isLoading: authLoading } = useAuth()
+  const router = useRouter()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [searchText, setSearchText] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('全部')
   const [selectedCondition, setSelectedCondition] = useState('全部')
+  const [filterMyProducts, setFilterMyProducts] = useState(false)
   const [sortBy, setSortBy] = useState('default')
   const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     fetchProducts()
-  }, [])
+  }, [user, filterMyProducts])
 
   const fetchProducts = async () => {
     setLoading(true)
     try {
-      const response = await fetch(API_ENDPOINTS.PRODUCTS)
+      let url = API_ENDPOINTS.PRODUCTS
+
+      const params = new URLSearchParams()
+
+      if (filterMyProducts && user) {
+        params.append('isMyProducts', 'true')
+        params.append('userId', user.id)
+      }
+
+      const queryString = params.toString()
+      if (queryString) {
+        url = `${url}?${queryString}`
+      }
+
+      const response = await fetch(url)
       const result = await response.json()
       if (result.success) {
         setProducts(result.data)
@@ -86,17 +114,51 @@ export default function ProductsPage() {
     }
   }
 
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'available':
+        return '在售'
+      case 'reserved':
+        return '已预订'
+      case 'sold':
+        return '已售出'
+      case 'offline':
+        return '已下架'
+      default:
+        return status
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'available':
+        return 'green'
+      case 'reserved':
+        return 'orange'
+      case 'sold':
+        return 'default'
+      case 'offline':
+        return 'default'
+      default:
+        return 'default'
+    }
+  }
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
     const now = new Date()
     const diff = now.getTime() - date.getTime()
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-    
+
     if (days === 0) return '今天'
     if (days === 1) return '1天前'
     if (days < 7) return `${days}天前`
     if (days < 30) return `${Math.floor(days / 7)}周前`
     return `${Math.floor(days / 30)}个月前`
+  }
+
+  const isMyProduct = (product: Product) => {
+    return isLoggedIn && user && product.userId === user.id
   }
 
   const filteredProducts = products.filter((product) => {
@@ -168,7 +230,7 @@ export default function ProductsPage() {
             </div>
 
             <Row gutter={[16, 16]} align="middle">
-              <Col xs={24} md={10}>
+              <Col xs={24} md={8}>
                 <Search
                   placeholder="搜索商品名称、描述..."
                   allowClear
@@ -226,22 +288,21 @@ export default function ProductsPage() {
                   ))}
                 </Select>
               </Col>
-              <Col xs={12} sm={24} md={2}>
-                <Link href="/products/new" style={{ display: 'block' }}>
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
+              {isLoggedIn && (
+                <Col xs={12} sm={8} md={4}>
+                  <Select
+                    placeholder="筛选我的商品"
                     size="large"
-                    style={{
-                      width: '100%',
-                      borderRadius: '8px',
-                      height: '40px',
-                    }}
+                    style={{ width: '100%', borderRadius: '8px' }}
+                    value={filterMyProducts ? 'my' : 'all'}
+                    onChange={(value) => setFilterMyProducts(value === 'my')}
+                    suffixIcon={<UserOutlined />}
                   >
-                    发布商品
-                  </Button>
-                </Link>
-              </Col>
+                    <Option value="all">全部商品</Option>
+                    <Option value="my">我的商品</Option>
+                  </Select>
+                </Col>
+              )}
             </Row>
           </Space>
         </div>
@@ -321,46 +382,30 @@ export default function ProductsPage() {
                               width: '100%',
                             }}
                           />
-                          {product.status === 'available' && (
+                          <Tag
+                            color={getStatusColor(product.status)}
+                            style={{
+                              position: 'absolute',
+                              top: '12px',
+                              left: '12px',
+                              margin: 0,
+                              borderRadius: '4px',
+                            }}
+                          >
+                            {getStatusText(product.status)}
+                          </Tag>
+                          {isMyProduct(product) && (
                             <Tag
-                              color="green"
+                              color="blue"
                               style={{
                                 position: 'absolute',
                                 top: '12px',
-                                left: '12px',
+                                left: product.status !== 'available' ? '70px' : '54px',
                                 margin: 0,
                                 borderRadius: '4px',
                               }}
                             >
-                              在售
-                            </Tag>
-                          )}
-                          {product.status === 'reserved' && (
-                            <Tag
-                              color="orange"
-                              style={{
-                                position: 'absolute',
-                                top: '12px',
-                                left: '12px',
-                                margin: 0,
-                                borderRadius: '4px',
-                              }}
-                            >
-                              已预订
-                            </Tag>
-                          )}
-                          {product.status === 'sold' && (
-                            <Tag
-                              color="default"
-                              style={{
-                                position: 'absolute',
-                                top: '12px',
-                                left: '12px',
-                                margin: 0,
-                                borderRadius: '4px',
-                              }}
-                            >
-                              已售出
+                              我的
                             </Tag>
                           )}
                           <Tag
@@ -422,6 +467,12 @@ export default function ProductsPage() {
                           </Text>
                         )}
                       </div>
+
+                      {product.quantity > 1 && (
+                        <Tag color="purple" style={{ marginBottom: '8px' }}>
+                          库存: {product.quantity}件
+                        </Tag>
+                      )}
 
                       <Divider style={{ margin: '12px 0' }} />
 
@@ -487,13 +538,7 @@ export default function ProductsPage() {
                   <Text type="secondary">尝试调整筛选条件或搜索关键词</Text>
                 </div>
               }
-            >
-              <Link href="/products/new">
-                <Button type="primary" icon={<PlusOutlined />}>
-                  发布第一个商品
-                </Button>
-              </Link>
-            </Empty>
+            />
           </div>
         )}
       </div>

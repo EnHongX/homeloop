@@ -3,7 +3,7 @@
 import { Layout, Typography, Button, Space, Menu, Drawer, theme, Dropdown, Avatar, message } from 'antd'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { HomeOutlined, PlusOutlined, ShoppingOutlined, MenuOutlined, UserOutlined, LogoutOutlined, LoginOutlined } from '@ant-design/icons'
+import { HomeOutlined, PlusOutlined, ShoppingOutlined, MenuOutlined, UserOutlined, LogoutOutlined, LoginOutlined, AppstoreOutlined } from '@ant-design/icons'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -30,6 +30,7 @@ export default function AppLayout({
   const getSelectedKey = () => {
     if (pathname === '/') return '/'
     if (pathname.startsWith('/login')) return '/login'
+    if (pathname.startsWith('/my-products')) return '/my-products'
     if (pathname.startsWith('/products/new')) return '/products/new'
     if (pathname.startsWith('/products')) return '/products'
     return '/'
@@ -59,6 +60,21 @@ export default function AppLayout({
       icon: <UserOutlined />,
       label: user?.phone,
       disabled: true,
+    },
+    {
+      type: 'divider' as const,
+    },
+    {
+      key: 'my-products',
+      icon: <AppstoreOutlined />,
+      label: '我的发布',
+      onClick: () => router.push('/my-products'),
+    },
+    {
+      key: 'publish',
+      icon: <PlusOutlined />,
+      label: '发布商品',
+      onClick: () => router.push('/products/new'),
     },
     {
       type: 'divider' as const,
@@ -109,6 +125,15 @@ export default function AppLayout({
 
     if (isLoggedIn) {
       items.push(
+        {
+          key: '/my-products',
+          label: (
+            <Link href="/my-products" style={{ display: 'block' }}>
+              我的发布
+            </Link>
+          ),
+          icon: <AppstoreOutlined />,
+        },
         { type: 'divider' as const },
         {
           key: 'user',
@@ -260,6 +285,24 @@ export default function AppLayout({
                   <ShoppingOutlined />
                   浏览商品
                 </Link>
+                {isLoggedIn && (
+                  <Link
+                    href="/my-products"
+                    style={{
+                      color: selectedKey === '/my-products' ? token.colorPrimary : token.colorText,
+                      fontWeight: selectedKey === '/my-products' ? 500 : 400,
+                      textDecoration: 'none',
+                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'color 0.2s',
+                    }}
+                  >
+                    <AppstoreOutlined />
+                    我的发布
+                  </Link>
+                )}
                 <Button
                   type="primary"
                   icon={<PlusOutlined />}
