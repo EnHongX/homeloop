@@ -25,6 +25,12 @@ const { Option } = Select
 const categories = ['沙发', '桌椅', '柜子', '床', '灯具', '装饰', '其他']
 const conditions = ['全新', '九成新', '八成新', '七成新及以下']
 
+const deliveryMethodOptions = [
+  { value: 'self-pickup', label: '自提' },
+  { value: 'free-shipping', label: '包邮' },
+  { value: 'shipping-on-buyer', label: '运费自付' },
+]
+
 interface ImageFile {
   uid: string
   name: string
@@ -47,6 +53,8 @@ interface Product {
   contactInfo: string | null
   status: string
   userId: string | null
+  quantity: number
+  deliveryMethod: string | null
   category: {
     id: string
     name: string
@@ -74,26 +82,26 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
     setLoading(true)
     setNotFound(false)
     setNoPermission(false)
-    
+
     if (!user) {
       setNoPermission(true)
       setLoading(false)
       return
     }
-    
+
     try {
       const response = await fetch(`${API_ENDPOINTS.PRODUCTS}/${params.id}`)
       const result = await response.json()
       if (result.success) {
         const data = result.data
         setProduct(data)
-        
+
         if (data.userId && user.id !== data.userId) {
           setNoPermission(true)
           setLoading(false)
           return
         }
-        
+
         const initialFileList: ImageFile[] = data.images.map((img: string, index: number) => ({
           uid: `-${index}`,
           name: `image-${index}.jpg`,
@@ -111,6 +119,8 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
           originalPrice: data.originalPrice || undefined,
           category: data.category?.name || '其他',
           condition: data.condition,
+          quantity: data.quantity || 1,
+          deliveryMethod: data.deliveryMethod || undefined,
           location: data.location || '',
           contactInfo: data.contactInfo || '',
           status: data.status,
@@ -132,16 +142,16 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
 
   const handleUpload = async (options: any) => {
     const { file, onSuccess, onError } = options
-    
+
     console.log('handleUpload called with file:', file.name)
-    
+
     try {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('folder', 'products')
 
       console.log('Uploading to', API_ENDPOINTS.UPLOAD)
-      
+
       const response = await fetch(API_ENDPOINTS.UPLOAD, {
         method: 'POST',
         body: formData,
@@ -167,7 +177,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
 
   const handleFileChange = (info: any) => {
     const { file, fileList: newFileList } = info
-    
+
     console.log('handleFileChange called, file.status:', file.status)
     console.log('file.response:', file.response)
     console.log('newFileList:', newFileList)
@@ -176,16 +186,16 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
     const updatedList: ImageFile[] = newFileList.map((f: any) => {
       const existingFile = fileList.find(ef => ef.uid === f.uid)
       let ossUrl = f.response?.ossUrl || f.response?.url || f.ossUrl
-      
+
       if (!ossUrl && existingFile?.ossUrl) {
         ossUrl = existingFile.ossUrl
       }
       if (!ossUrl && f.url && !f.originFileObj) {
         ossUrl = f.url
       }
-      
+
       console.log(`File ${f.name}: status=${f.status}, ossUrl=${ossUrl}, f.url=${f.url}, existingFile.ossUrl=${existingFile?.ossUrl}`)
-      
+
       const finalUrl = ossUrl || f.url || f.thumbUrl || existingFile?.url || ''
       return {
         uid: f.uid,
@@ -242,7 +252,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
         const fileName = file.name.toLowerCase()
         const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif']
         const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext))
-        
+
         if (!hasValidExtension) {
           message.error('只能上传 JPG、PNG、WebP、GIF 格式的图片!')
           return Upload.LIST_IGNORE
@@ -263,7 +273,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
     console.log('onFinish called with values:', values)
     console.log('current fileList:', fileList.map(f => ({ name: f.name, status: f.status, ossUrl: f.ossUrl, url: f.url })))
     console.log('original product.images:', product?.images)
-    
+
     const hasUploading = fileList.some(f => f.status === 'uploading')
     if (hasUploading) {
       message.warning('图片正在上传中，请稍候...')
@@ -277,19 +287,19 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
     }
 
     let imageUrls: string[] = []
-    
+
     const uploadedImages = fileList.filter(f => f.status === 'done' && (f.ossUrl || f.url))
     console.log('uploadedImages from fileList:', uploadedImages)
-    
+
     if (uploadedImages.length > 0) {
       imageUrls = uploadedImages.map(f => f.ossUrl || f.url!)
     } else if (product && product.images && product.images.length > 0) {
       console.log('Using original product.images:', product.images)
       imageUrls = product.images
     }
-    
+
     console.log('Final imageUrls:', imageUrls)
-    
+
     if (imageUrls.length === 0) {
       message.error('请至少保留一张商品图片')
       return
@@ -308,6 +318,8 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
         contactInfo: values.contactInfo,
         status: values.status || 'available',
         images: imageUrls,
+        quantity: values.quantity || 1,
+        deliveryMethod: values.deliveryMethod || null,
       }
 
       console.log('Sending product data:', productData)
@@ -639,6 +651,51 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
               </Col>
             </Row>
 
+            <Row gutter={[20, 20]}>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  name="quantity"
+                  label={
+                    <span>
+                      <Text strong>商品数量</Text>
+                      <Text type="danger" style={{ marginLeft: '4px' }}>*</Text>
+                    </span>
+                  }
+                  rules={[{ required: true, message: '请输入商品数量' }]}
+                  extra="如果有多个相同商品，可填写数量"
+                >
+                  <InputNumber
+                    placeholder="请输入商品数量"
+                    min={1}
+                    style={{ width: '100%', height: '44px', borderRadius: '8px' }}
+                    size="large"
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  name="deliveryMethod"
+                  label={
+                    <span>
+                      <Text strong>取货方式</Text>
+                      <Text type="secondary" style={{ marginLeft: '4px', fontSize: '12px' }}>
+                        (选填)
+                      </Text>
+                    </span>
+                  }
+                  extra="选择交易方式，方便买家了解"
+                >
+                  <Select
+                    placeholder="请选择取货方式"
+                    style={{ borderRadius: '8px', height: '44px' }}
+                    size="large"
+                    allowClear
+                    options={deliveryMethodOptions}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
             <Form.Item
               name="description"
               label={
@@ -704,6 +761,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
             >
               <Radio.Group size="large">
                 <Radio.Button value="available">在售</Radio.Button>
+                <Radio.Button value="offline">已下架</Radio.Button>
                 <Radio.Button value="reserved">已预订</Radio.Button>
                 <Radio.Button value="sold">已售出</Radio.Button>
               </Radio.Group>

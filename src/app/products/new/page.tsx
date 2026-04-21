@@ -2,7 +2,7 @@
 
 import { Typography, Button, Card, Row, Col, Form, Input, InputNumber, Select, Upload, Radio, Space, Breadcrumb, message, Divider, theme, Steps, Alert } from 'antd'
 import Link from 'next/link'
-import { HomeOutlined, PlusOutlined, ArrowLeftOutlined, FileTextOutlined, PictureOutlined, TagOutlined, EnvironmentOutlined, PhoneOutlined, CheckCircleOutlined, LoadingOutlined } from '@ant-design/icons'
+import { HomeOutlined, PlusOutlined, ArrowLeftOutlined, FileTextOutlined, PictureOutlined, TagOutlined, EnvironmentOutlined, PhoneOutlined, CheckCircleOutlined, LoadingOutlined, CarOutlined } from '@ant-design/icons'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import AppLayout from '@/components/AppLayout'
@@ -24,6 +24,12 @@ const { Option } = Select
 
 const categories = ['沙发', '桌椅', '柜子', '床', '灯具', '装饰', '其他']
 const conditions = ['全新', '九成新', '八成新', '七成新及以下']
+
+const deliveryMethodOptions = [
+  { value: 'self-pickup', label: '自提' },
+  { value: 'free-shipping', label: '包邮' },
+  { value: 'shipping-on-buyer', label: '运费自付' },
+]
 
 interface ImageFile {
   uid: string
@@ -67,7 +73,7 @@ export default function NewProductPage() {
       description: '设置价格和分类',
     },
     {
-      title: '联系方式',
+      title: '交易信息',
       icon: <PhoneOutlined />,
       description: '填写交易信息',
     },
@@ -75,16 +81,16 @@ export default function NewProductPage() {
 
   const handleUpload = async (options: any) => {
     const { file, onSuccess, onError } = options
-    
+
     console.log('handleUpload called with file:', file.name)
-    
+
     try {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('folder', 'products')
 
       console.log('Uploading to', API_ENDPOINTS.UPLOAD)
-      
+
       const response = await fetch(API_ENDPOINTS.UPLOAD, {
         method: 'POST',
         body: formData,
@@ -110,7 +116,7 @@ export default function NewProductPage() {
 
   const handleFileChange = (info: any) => {
     const { file, fileList: newFileList } = info
-    
+
     console.log('handleFileChange called, file.status:', file.status)
     console.log('file.response:', file.response)
 
@@ -171,7 +177,7 @@ export default function NewProductPage() {
         const fileName = file.name.toLowerCase()
         const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif']
         const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext))
-        
+
         if (!hasValidExtension) {
           message.error('只能上传 JPG、PNG、WebP、GIF 格式的图片!')
           return Upload.LIST_IGNORE
@@ -191,7 +197,7 @@ export default function NewProductPage() {
   const onFinish = async (values: any) => {
     console.log('onFinish called with values:', values)
     console.log('current fileList:', fileList.map(f => ({ name: f.name, status: f.status, ossUrl: f.ossUrl })))
-    
+
     const hasUploading = fileList.some(f => f.status === 'uploading')
     if (hasUploading) {
       message.warning('图片正在上传中，请稍候...')
@@ -206,7 +212,7 @@ export default function NewProductPage() {
 
     const uploadedImages = fileList.filter(f => f.status === 'done' && f.ossUrl)
     console.log('uploadedImages:', uploadedImages)
-    
+
     if (uploadedImages.length === 0) {
       message.error('请至少上传一张商品图片')
       return
@@ -227,12 +233,14 @@ export default function NewProductPage() {
         contactInfo: values.contactInfo,
         status: values.status || 'available',
         images: imageUrls,
+        quantity: values.quantity || 1,
+        deliveryMethod: values.deliveryMethod || null,
       }
 
       console.log('Sending product data:', productData)
 
       const token = getToken()
-      
+
       const response = await fetch(API_ENDPOINTS.PRODUCTS, {
         method: 'POST',
         headers: {
@@ -292,7 +300,7 @@ export default function NewProductPage() {
           return
         }
       } else if (currentStep === 2) {
-        await form.validateFields(['price', 'category', 'condition'])
+        await form.validateFields(['price', 'category', 'condition', 'quantity'])
       }
       setCurrentStep(currentStep + 1)
     } catch (error) {
@@ -375,6 +383,7 @@ export default function NewProductPage() {
             initialValues={{
               condition: '九成新',
               status: 'available',
+              quantity: 1,
             }}
             size="large"
           >
@@ -601,6 +610,51 @@ export default function NewProductPage() {
                       style={{ borderRadius: '8px', height: '44px' }}
                       size="large"
                       options={conditions.map((cond) => ({ label: cond, value: cond }))}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Row gutter={[20, 20]}>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="quantity"
+                    label={
+                      <span>
+                        <Text strong>商品数量</Text>
+                        <Text type="danger" style={{ marginLeft: '4px' }}>*</Text>
+                      </span>
+                    }
+                    rules={[{ required: true, message: '请输入商品数量' }]}
+                    extra="如果有多个相同商品，可填写数量"
+                  >
+                    <InputNumber
+                      placeholder="请输入商品数量"
+                      min={1}
+                      style={{ width: '100%', height: '44px', borderRadius: '8px' }}
+                      size="large"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="deliveryMethod"
+                    label={
+                      <span>
+                        <Text strong>取货方式</Text>
+                        <Text type="secondary" style={{ marginLeft: '4px', fontSize: '12px' }}>
+                          (选填)
+                        </Text>
+                      </span>
+                    }
+                    extra="选择交易方式，方便买家了解"
+                  >
+                    <Select
+                      placeholder="请选择取货方式"
+                      style={{ borderRadius: '8px', height: '44px' }}
+                      size="large"
+                      allowClear
+                      options={deliveryMethodOptions}
                     />
                   </Form.Item>
                 </Col>

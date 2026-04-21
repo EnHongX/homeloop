@@ -39,6 +39,8 @@ model Product {
   user            User?      @relation(fields: [userId], references: [id])
   views           Int        @default(0)
   isFeatured      Boolean    @default(false)
+  quantity        Int        @default(1)
+  deliveryMethod  String?
 }
 
 model Category {
